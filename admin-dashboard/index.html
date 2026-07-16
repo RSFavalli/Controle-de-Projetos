@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Timesheet — Dashboard Admin</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+  <header class="admin-header">
+    <div class="admin-header__brand">
+      <span class="admin-header__logo" aria-hidden="true">⚙️</span>
+      <div>
+        <h1>Timesheet — Dashboard Admin</h1>
+        <p class="admin-header__subtitle">Gestão de clientes, projetos e colaboradores</p>
+      </div>
+    </div>
+    <div id="sessionInfo" class="admin-header__session hidden">
+      <span id="sessionUserName"></span>
+      <button id="logoutButton" class="btn btn--ghost btn--small">Sair</button>
+    </div>
+  </header>
+
+  <main class="admin-main">
+
+    <div id="toastArea" class="toast-area" aria-live="assertive"></div>
+
+    <!-- ------------------------- Tela de configuração da API ------------------------- -->
+    <section id="configScreen" class="card auth-card hidden">
+      <h2>Conectar ao backend</h2>
+      <p class="muted">
+        Cole aqui a URL do Google Apps Script (Web App) publicada seguindo o guia
+        <code>backend/SETUP.md</code>. Ela termina em <code>/exec</code>.
+      </p>
+      <form id="configForm" class="stacked-form">
+        <div class="field">
+          <label for="apiUrlInput">URL da API</label>
+          <input type="url" id="apiUrlInput" placeholder="https://script.google.com/macros/s/XXXX/exec" required />
+        </div>
+        <button type="submit" class="btn btn--start">Salvar e continuar</button>
+      </form>
+      <p id="configTestResult" class="config-test-result"></p>
+    </section>
+
+    <!-- ------------------------------- Tela de login ------------------------------- -->
+    <section id="loginScreen" class="card auth-card hidden">
+      <h2>Entrar</h2>
+      <p class="muted">Acesso restrito a colaboradores com perfil administrador.</p>
+      <form id="loginForm" class="stacked-form">
+        <div class="field">
+          <label for="loginEmail">E-mail</label>
+          <input type="email" id="loginEmail" required autocomplete="username" />
+        </div>
+        <div class="field">
+          <label for="loginPassword">Senha</label>
+          <input type="password" id="loginPassword" required autocomplete="current-password" />
+        </div>
+        <button type="submit" class="btn btn--start">Entrar</button>
+      </form>
+      <button id="changeApiUrlButton" class="link-button">Trocar URL da API</button>
+    </section>
+
+    <!-- ------------------------------ Dashboard ------------------------------ -->
+    <section id="dashboardScreen" class="hidden">
+
+      <nav class="tabs" role="tablist">
+        <button class="tab-button is-active" data-tab="clientes" role="tab">Clientes</button>
+        <button class="tab-button" data-tab="projetos" role="tab">Projetos</button>
+        <button class="tab-button" data-tab="colaboradores" role="tab">Colaboradores</button>
+      </nav>
+
+      <!-- ---------------- Clientes ---------------- -->
+      <section id="tab-clientes" class="tab-panel card">
+        <div class="panel-header">
+          <h2>Clientes</h2>
+          <button class="btn btn--start btn--small" id="newClienteButton">+ Novo cliente</button>
+        </div>
+
+        <form id="clienteForm" class="inline-form hidden">
+          <input type="hidden" id="clienteId" />
+          <div class="field">
+            <label for="clienteNome">Nome do cliente</label>
+            <input type="text" id="clienteNome" required />
+          </div>
+          <div class="field field--checkbox">
+            <label><input type="checkbox" id="clienteAtivo" checked /> Ativo</label>
+          </div>
+          <div class="inline-form__actions">
+            <button type="submit" class="btn btn--start btn--small">Salvar</button>
+            <button type="button" class="btn btn--ghost btn--small" id="cancelClienteButton">Cancelar</button>
+          </div>
+        </form>
+
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr><th>Nome</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody id="clientesTableBody"></tbody>
+          </table>
+          <p id="clientesEmptyState" class="empty-state hidden">Nenhum cliente cadastrado ainda.</p>
+        </div>
+      </section>
+
+      <!-- ---------------- Projetos ---------------- -->
+      <section id="tab-projetos" class="tab-panel card hidden">
+        <div class="panel-header">
+          <h2>Projetos</h2>
+          <button class="btn btn--start btn--small" id="newProjetoButton">+ Novo projeto</button>
+        </div>
+
+        <form id="projetoForm" class="inline-form hidden">
+          <input type="hidden" id="projetoId" />
+          <div class="field">
+            <label for="projetoCliente">Cliente</label>
+            <select id="projetoCliente" required></select>
+          </div>
+          <div class="field">
+            <label for="projetoNome">Nome do projeto</label>
+            <input type="text" id="projetoNome" required />
+          </div>
+          <div class="field field--checkbox">
+            <label><input type="checkbox" id="projetoAtivo" checked /> Ativo</label>
+          </div>
+          <div class="inline-form__actions">
+            <button type="submit" class="btn btn--start btn--small">Salvar</button>
+            <button type="button" class="btn btn--ghost btn--small" id="cancelProjetoButton">Cancelar</button>
+          </div>
+        </form>
+
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr><th>Cliente</th><th>Projeto</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody id="projetosTableBody"></tbody>
+          </table>
+          <p id="projetosEmptyState" class="empty-state hidden">Nenhum projeto cadastrado ainda.</p>
+        </div>
+      </section>
+
+      <!-- ---------------- Colaboradores ---------------- -->
+      <section id="tab-colaboradores" class="tab-panel card hidden">
+        <div class="panel-header">
+          <h2>Colaboradores</h2>
+          <button class="btn btn--start btn--small" id="newColaboradorButton">+ Novo colaborador</button>
+        </div>
+
+        <form id="colaboradorForm" class="inline-form hidden">
+          <input type="hidden" id="colaboradorId" />
+          <div class="field">
+            <label for="colaboradorNome">Nome</label>
+            <input type="text" id="colaboradorNome" required />
+          </div>
+          <div class="field">
+            <label for="colaboradorEmail">E-mail</label>
+            <input type="email" id="colaboradorEmail" required />
+          </div>
+          <div class="field">
+            <label for="colaboradorSenha">Senha</label>
+            <input type="password" id="colaboradorSenha" placeholder="Deixe em branco para manter a atual" />
+          </div>
+          <div class="field">
+            <label for="colaboradorPapel">Perfil</label>
+            <select id="colaboradorPapel">
+              <option value="colaborador">Colaborador</option>
+              <option value="admin">Administrador</option>
+            </select>
+          </div>
+          <div class="field field--checkbox">
+            <label><input type="checkbox" id="colaboradorAtivo" checked /> Ativo</label>
+          </div>
+          <div class="inline-form__actions">
+            <button type="submit" class="btn btn--start btn--small">Salvar</button>
+            <button type="button" class="btn btn--ghost btn--small" id="cancelColaboradorButton">Cancelar</button>
+          </div>
+        </form>
+
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody id="colaboradoresTableBody"></tbody>
+          </table>
+          <p id="colaboradoresEmptyState" class="empty-state hidden">Nenhum colaborador cadastrado ainda.</p>
+        </div>
+      </section>
+
+    </section>
+
+  </main>
+
+  <footer class="admin-footer">
+    <p>Dados armazenados em uma planilha do Google Sheets, acessada via Google Apps Script. Veja <code>backend/SETUP.md</code> para detalhes.</p>
+  </footer>
+
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+# Sistema operacional / editor
+.DS_Store
+Thumbs.db
+*.swp
+
+# Logs e artefatos de teste locais
+*.log
+screenshot-*.png
+dashboard-*.png
+
+# Node (caso alguém rode os testes Playwright localmente)
+node_modules/
