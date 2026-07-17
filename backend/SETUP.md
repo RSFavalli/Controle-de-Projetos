@@ -2,7 +2,7 @@
 
 Passo a passo para colocar a API no ar. Leva uns 10 minutos, tudo feito na sua conta Google — eu não tenho acesso a essa conta, então esses passos precisam ser feitos por você.
 
-> **Já configurou antes e está atualizando o `Code.gs`?** A versão atual libera a leitura de Clientes/Projetos (`listClientes`/`listProjetos`) para qualquer colaborador autenticado, não só admin — é o que o app de campo usa para carregar essas listas. Cole o `Code.gs` novo por cima do antigo (passo 2) e **implante uma nova versão** (passo 6 tem o caminho: Implantar → Gerenciar implantações → ícone de lápis → Nova versão → Implantar). A URL do Web App continua a mesma.
+> **Já configurou antes e está atualizando o `Code.gs`?** A versão atual libera a leitura de Clientes/Projetos (`listClientes`/`listProjetos`) para qualquer colaborador autenticado, não só admin — é o que o app de campo usa para carregar essas listas. Também adiciona a aba **Apontamentos** (usada pela sincronização dos registros de horas do app de campo) e um **limite de tentativas de login** (bloqueia por 15 min um e-mail depois de 5 senhas erradas seguidas, para dificultar força bruta). Cole o `Code.gs` novo por cima do antigo (passo 2), **rode `seedDatabase` de novo** (passo 4 — é seguro rodar mais de uma vez, só cria o que ainda não existe) para criar a aba Apontamentos, e **implante uma nova versão** (passo 6 tem o caminho: Implantar → Gerenciar implantações → ícone de lápis → Nova versão → Implantar). A URL do Web App continua a mesma.
 
 ## 1. Criar a planilha
 
@@ -80,7 +80,7 @@ Alterações no script só valem depois de uma **nova implantação** (ou de edi
 
 Este backend é propositalmente simples, pensado para uma equipe pequena e uso interno:
 
-- Senhas são guardadas como hash (SHA-256 + salt), nunca em texto puro — mas não há limite de tentativas de login, nem rotação/expiração de senha.
+- Senhas são guardadas como hash (SHA-256 + salt), nunca em texto puro. Login tem limite de tentativas (5 erradas seguidas bloqueiam aquele e-mail por 15 minutos), mas ainda não há rotação/expiração de senha.
 - A autenticação é reenviada a cada chamada (e-mail + senha), sem tokens de sessão — funciona, mas não é o padrão de mercado para produtos voltados ao público externo.
 - Qualquer pessoa com a URL do Web App pode tentar chamar a API (ela só responde com dados de verdade se e-mail/senha baterem) — não publique essa URL em lugar público.
 

@@ -35,6 +35,17 @@
     entriesTableBody: document.getElementById('entriesTableBody'),
     entriesEmptyState: document.getElementById('entriesEmptyState'),
     todayTotal: document.getElementById('todayTotal'),
+    entriesSyncStatus: document.getElementById('entriesSyncStatus'),
+
+    editEntryForm: document.getElementById('editEntryForm'),
+    editEntryId: document.getElementById('editEntryId'),
+    editEntryClient: document.getElementById('editEntryClient'),
+    editEntryProject: document.getElementById('editEntryProject'),
+    editEntryActivity: document.getElementById('editEntryActivity'),
+    editEntryStart: document.getElementById('editEntryStart'),
+    editEntryEnd: document.getElementById('editEntryEnd'),
+    editEntryObservations: document.getElementById('editEntryObservations'),
+    cancelEditEntryButton: document.getElementById('cancelEditEntryButton'),
     statusBar: document.getElementById('statusBar'),
     connectionText: document.getElementById('connectionText'),
 
@@ -116,6 +127,12 @@
     els.clientSelect.addEventListener('change', onClientChange);
     els.startButton.addEventListener('click', onStartClick);
     els.stopButton.addEventListener('click', onStopClick);
+
+    els.editEntryForm.addEventListener('submit', onEditEntrySubmit);
+    els.cancelEditEntryButton.addEventListener('click', closeEditEntryForm);
+    els.editEntryClient.addEventListener('change', () => {
+      populateEditProjectSelect(els.editEntryClient.value);
+    });
   }
 
   function showScreen(name) {
@@ -127,14 +144,22 @@
   }
 
   function populateActivities() {
-    const placeholder = els.activitySelect.querySelector('option[value=""]');
     els.activitySelect.innerHTML = '';
-    if (placeholder) els.activitySelect.appendChild(placeholder);
+    fillActivityOptions(els.activitySelect);
+  }
+
+  function fillActivityOptions(selectEl, placeholderText) {
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    placeholder.textContent = placeholderText || 'Selecione a atividade';
+    selectEl.appendChild(placeholder);
     window.APP_DATA.ACTIVITIES.forEach((activity) => {
       const opt = document.createElement('option');
       opt.value = activity.id;
       opt.textContent = `${activity.order}. ${activity.name}`;
-      els.activitySelect.appendChild(opt);
+      selectEl.appendChild(opt);
     });
   }
 
@@ -177,6 +202,7 @@
       els.loginPassword.value = '';
       enterApp(profile);
       syncData(email, senha, { silent: true });
+      syncEntries({ silent: true });
       return;
     } catch (err) {
       if (!err.isNetworkError) {
@@ -225,6 +251,7 @@
     if (!session) return;
     if (inMemorySenha) {
       await syncData(session.email, inMemorySenha);
+      await syncEntries();
     } else {
       showScreen('reauth');
       els.reauthPassword.focus();
@@ -242,6 +269,7 @@
       els.reauthPassword.value = '';
       showScreen('app');
       await syncData(session.email, senha);
+      await syncEntries();
     } catch (err) {
       toast(err.isNetworkError ? 'Sem conexão. Tente novamente quando estiver online.' : err.message, 'error');
     }
@@ -272,6 +300,52 @@
     const hh = String(date.getHours()).padStart(2, '0');
     const mm = String(date.getMinutes()).padStart(2, '0');
     els.syncStatus.textContent = `Sincronizado às ${hh}:${mm}`;
+  }
+
+  /* ------------------------ Sincronização de apontamentos ------------------------ */
+
+  async function syncEntries(opts = {}) {
+    const session = DB.getSession();
+    if (!session || !inMemorySenha) return;
+
+    const pending = DB.getUnsyncedEntries(session.id);
+    const deletedIds = DB.getPendingDeletes();
+    if (pending.length === 0 && deletedIds.length === 0) {
+      if (!opts.silent) toast('Nenhum apontamento pendente de sincronização.', 'success');
+      updateEntriesSyncStatusUi();
+      return;
+    }
+
+    try {
+      await Api.syncApontamentos(session.email, inMemorySenha, pending, deletedIds);
+      const now = new Date().toISOString();
+      DB.markEntriesSynced(pending.map((e) => e.id), now);
+      DB.clearPendingDeletes(deletedIds);
+      DB.setLastEntriesSync(now);
+      updateEntriesSyncStatusUi();
+      if (!opts.silent) toast(`${pending.length} apontamento(s) sincronizado(s).`, 'success');
+    } catch (err) {
+      updateEntriesSyncStatusUi();
+      if (!opts.silent) {
+        toast(
+          err.isNetworkError ? 'Sem conexão para sincronizar os apontamentos agora.' : err.message,
+          'error'
+        );
+      }
+    }
+  }
+
+  function updateEntriesSyncStatusUi() {
+    const session = DB.getSession();
+    if (!session) return;
+    const pendingCount = DB.getUnsyncedEntries(session.id).length + DB.getPendingDeletes().length;
+    els.entriesSyncStatus.classList.toggle('entries-card__sync-status--pending', pendingCount > 0);
+    if (pendingCount > 0) {
+      els.entriesSyncStatus.textContent = `${pendingCount} pendente(s) de sincronização`;
+    } else {
+      const last = DB.getLastEntriesSync();
+      els.entriesSyncStatus.textContent = last ? 'Apontamentos sincronizados' : 'Ainda não sincronizado';
+    }
   }
 
   /* ------------------------------ Cliente / Projeto ----------------------------- */
@@ -386,18 +460,161 @@
     els.projectSelect.disabled = true;
     els.activitySelect.value = '';
     refreshAppUi();
+    syncEntries({ silent: true });
   }
 
   function onCloseDanglingEntry(entryId) {
     Timer.closeEntryManually(entryId, '23:59');
     refreshAppUi();
+    syncEntries({ silent: true });
   }
 
   function onDeleteEntry(entryId) {
     const confirmed = confirm('Excluir este apontamento? Essa ação não pode ser desfeita.');
     if (!confirmed) return;
+    const entry = DB.getEntries().find((e) => e.id === entryId);
+    if (entry && entry.syncedAt) {
+      DB.addPendingDelete(entryId);
+    }
     DB.deleteEntry(entryId);
     refreshAppUi();
+    syncEntries({ silent: true });
+  }
+
+  /* ------------------------ Edição de apontamento ------------------------ */
+
+  function populateEditClientSelect(selectedClientId) {
+    const clientes = DB.getCachedClientes().filter((c) => c.ativo !== false);
+    els.editEntryClient.innerHTML = '';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.disabled = true;
+    placeholder.textContent = 'Selecione o cliente';
+    els.editEntryClient.appendChild(placeholder);
+    clientes
+      .slice()
+      .sort((a, b) => a.nome.localeCompare(b.nome))
+      .forEach((cliente) => {
+        const opt = document.createElement('option');
+        opt.value = cliente.id;
+        opt.textContent = cliente.nome;
+        els.editEntryClient.appendChild(opt);
+      });
+    els.editEntryClient.value = selectedClientId || '';
+  }
+
+  function populateEditProjectSelect(clienteId, selectedProjectId) {
+    const projetos = DB.getCachedProjetosByCliente(clienteId);
+    els.editEntryProject.innerHTML = '';
+
+    if (!clienteId || projetos.length === 0) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.disabled = true;
+      opt.selected = true;
+      opt.textContent = clienteId ? 'Nenhum projeto cadastrado para este cliente' : 'Selecione o cliente primeiro';
+      els.editEntryProject.appendChild(opt);
+      els.editEntryProject.disabled = true;
+      return;
+    }
+
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.disabled = true;
+    placeholder.textContent = 'Selecione o projeto';
+    els.editEntryProject.appendChild(placeholder);
+
+    projetos
+      .slice()
+      .sort((a, b) => a.nome.localeCompare(b.nome))
+      .forEach((projeto) => {
+        const opt = document.createElement('option');
+        opt.value = projeto.id;
+        opt.textContent = projeto.nome;
+        els.editEntryProject.appendChild(opt);
+      });
+
+    els.editEntryProject.disabled = false;
+    els.editEntryProject.value = selectedProjectId || '';
+  }
+
+  function openEditEntryForm(entry) {
+    els.editEntryId.value = entry.id;
+    populateEditClientSelect(entry.clientId);
+    populateEditProjectSelect(entry.clientId, entry.projectId);
+
+    els.editEntryActivity.innerHTML = '';
+    fillActivityOptions(els.editEntryActivity);
+    els.editEntryActivity.value = entry.activityId;
+
+    els.editEntryStart.value = entry.startTime || '';
+    els.editEntryEnd.value = entry.endTime || '';
+    els.editEntryObservations.value = entry.observations || '';
+
+    els.editEntryForm.classList.remove('hidden');
+    els.editEntryForm.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function closeEditEntryForm() {
+    els.editEntryForm.classList.add('hidden');
+    els.editEntryForm.reset();
+  }
+
+  function onEditEntrySubmit(e) {
+    e.preventDefault();
+    const entryId = els.editEntryId.value;
+    const entries = DB.getEntries();
+    const entry = entries.find((en) => en.id === entryId);
+    if (!entry) {
+      closeEditEntryForm();
+      return;
+    }
+
+    const clientId = els.editEntryClient.value;
+    const projectId = els.editEntryProject.value;
+    const activityId = els.editEntryActivity.value;
+    const startTimeStr = els.editEntryStart.value;
+    const endTimeStr = els.editEntryEnd.value;
+
+    if (!clientId || !projectId || !activityId || !startTimeStr || !endTimeStr) {
+      toast('Preencha Cliente, Projeto, Atividade, Início e Fim.', 'error');
+      return;
+    }
+
+    const cliente = DB.getCachedClientes().find((c) => c.id === clientId);
+    const projeto = DB.getCachedProjetos().find((p) => p.id === projectId);
+    const activity = window.APP_DATA.ACTIVITIES.find((a) => a.id === activityId);
+
+    const [y, m, d] = entry.date.split('-').map(Number);
+    const [sh, sm] = startTimeStr.split(':').map(Number);
+    const [eh, em] = endTimeStr.split(':').map(Number);
+    const startDate = new Date(y, m - 1, d, sh, sm, 0, 0);
+    const endDate = new Date(y, m - 1, d, eh, em, 0, 0);
+
+    if (endDate <= startDate) {
+      toast('O horário de fim deve ser depois do horário de início.', 'error');
+      return;
+    }
+
+    entry.clientId = cliente.id;
+    entry.clientName = cliente.nome;
+    entry.projectId = projeto.id;
+    entry.projectName = projeto.nome;
+    entry.activityId = activity.id;
+    entry.activityName = activity.name;
+    entry.startTime = startTimeStr;
+    entry.endTime = endTimeStr;
+    entry.startTimestamp = startDate.getTime();
+    entry.endTimestamp = endDate.getTime();
+    entry.durationMinutes = Math.round((endDate - startDate) / 60000);
+    entry.observations = els.editEntryObservations.value;
+    entry.updatedAt = new Date().toISOString();
+
+    DB.saveEntry(entry);
+    closeEditEntryForm();
+    refreshAppUi();
+    toast('Apontamento atualizado com sucesso.', 'success');
+    syncEntries({ silent: true });
   }
 
   function setFormLockedForRunning(isRunning) {
@@ -463,6 +680,14 @@
       const rowActions = document.createElement('div');
       rowActions.className = 'row-actions';
       if (entry.status !== 'em_andamento') {
+        const editBtn = document.createElement('button');
+        editBtn.type = 'button';
+        editBtn.className = 'row-actions__edit';
+        editBtn.title = 'Editar apontamento';
+        editBtn.textContent = 'Editar';
+        editBtn.addEventListener('click', () => openEditEntryForm(entry));
+        rowActions.appendChild(editBtn);
+
         const delBtn = document.createElement('button');
         delBtn.type = 'button';
         delBtn.title = 'Excluir apontamento';
@@ -533,6 +758,7 @@
     tickClock();
     renderEntries();
     renderAlerts();
+    updateEntriesSyncStatusUi();
   }
 
   /* ------------------------------ Utilitários ----------------------------- */
@@ -563,6 +789,7 @@
       const session = DB.getSession();
       if (session && inMemorySenha) {
         syncData(session.email, inMemorySenha, { silent: true });
+        syncEntries({ silent: true });
       }
     }
   }

@@ -154,8 +154,46 @@
       <section class="card entries-card" aria-labelledby="entriesHeading">
         <div class="entries-card__header">
           <h2 id="entriesHeading">Apontamentos de hoje</h2>
-          <span id="todayTotal" class="entries-card__total">Total: 00:00</span>
+          <div class="entries-card__header-right">
+            <span id="entriesSyncStatus" class="entries-card__sync-status"></span>
+            <span id="todayTotal" class="entries-card__total">Total: 00:00</span>
+          </div>
         </div>
+
+        <form id="editEntryForm" class="edit-entry-form hidden">
+          <h3>Editar apontamento</h3>
+          <input type="hidden" id="editEntryId" />
+          <div class="field-grid">
+            <div class="field">
+              <label for="editEntryClient">Cliente</label>
+              <select id="editEntryClient" required></select>
+            </div>
+            <div class="field">
+              <label for="editEntryProject">Projeto</label>
+              <select id="editEntryProject" required></select>
+            </div>
+            <div class="field">
+              <label for="editEntryActivity">Atividade</label>
+              <select id="editEntryActivity" required></select>
+            </div>
+            <div class="field">
+              <label for="editEntryStart">Início</label>
+              <input type="time" id="editEntryStart" required />
+            </div>
+            <div class="field">
+              <label for="editEntryEnd">Fim</label>
+              <input type="time" id="editEntryEnd" required />
+            </div>
+            <div class="field field--full">
+              <label for="editEntryObservations">Observações</label>
+              <textarea id="editEntryObservations" rows="2" placeholder="Opcional"></textarea>
+            </div>
+          </div>
+          <div class="inline-form__actions">
+            <button type="submit" class="btn btn--start btn--small">Salvar</button>
+            <button type="button" id="cancelEditEntryButton" class="btn btn--ghost btn--small">Cancelar</button>
+          </div>
+        </form>
 
         <div class="table-wrapper">
           <table class="entries-table">

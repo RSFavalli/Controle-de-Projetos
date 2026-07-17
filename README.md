@@ -60,8 +60,7 @@ timesheet-app/
 **Compartilhado (na planilha do Google Sheets, via `backend/`):**
 
 - Clientes, Projetos e Colaboradores (com senha em hash) — geridos pelo Dashboard Admin, lidos pelo app de campo.
-
-Os apontamentos (`ts_entries`) ainda **não** sobem para o backend — continuam só no dispositivo até a etapa de relatórios/exportação.
+- Apontamentos (`ts_entries`) — cada apontamento concluído sobe para a aba **Apontamentos** da planilha (por upsert, usando o `id` gerado no próprio dispositivo). Continuam também salvos localmente; a cópia local é a fonte da verdade em campo, a planilha é o destino para relatórios/consolidação.
 
 ## Regras já implementadas
 
@@ -73,10 +72,12 @@ Os apontamentos (`ts_entries`) ainda **não** sobem para o backend — continuam
 - **Lista "Apontamentos de hoje"**: mostra os registros do colaborador logado no dia atual, com total de horas somado automaticamente.
 - **Alerta de atividade aberta de dias anteriores** e **alerta de fim de expediente** (a partir das 18h) — mesma lógica de antes.
 - **Indicador online/offline** na barra do topo.
+- **Edição de apontamentos**: qualquer apontamento concluído do dia pode ser corrigido (Cliente, Projeto, Atividade, Início, Fim, Observações) pelo botão "Editar" na lista "Apontamentos de hoje".
+- **Sincronização de apontamentos**: apontamentos concluídos sobem sozinhos para a planilha (login, reconexão, logo após encerrar/editar/excluir um apontamento, e também pelo botão "Sincronizar"). Um indicador ao lado do total mostra quantos ainda estão pendentes de envio. Exclusão de um apontamento já sincronizado também remove a linha correspondente na planilha.
 
 ## O que falta (próximas etapas)
 
-1. **Relatórios/Sincronização de apontamentos**: hoje só Clientes/Projetos/Colaboradores viajam pelo backend — os apontamentos (`ts_entries`) continuam só no dispositivo. Falta uma tela para revisar e enviar esses dados para a planilha (alimentando as análises futuras no próprio Dashboard).
+1. **Relatórios**: os apontamentos já chegam na aba Apontamentos da planilha; falta construir as visões/relatórios de consolidação em cima desses dados (ex.: no próprio Dashboard).
 2. **Segurança de produção**: o modelo de autenticação atual (e-mail/senha reenviados a cada chamada, sem token de sessão; senha local cacheada como hash para uso offline) é adequado para uma equipe pequena e uso interno, mas não é o padrão de mercado — ver observações em `backend/SETUP.md`.
 
 ## Testes automatizados incluídos

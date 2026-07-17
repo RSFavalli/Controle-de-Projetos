@@ -32,6 +32,8 @@ const DB_KEYS = {
   CLIENTES_CACHE: 'ts_clientes_cache',
   PROJETOS_CACHE: 'ts_projetos_cache',
   LAST_SYNC: 'ts_last_sync',
+  PENDING_DELETES: 'ts_pending_deletes',
+  LAST_ENTRIES_SYNC: 'ts_last_entries_sync',
 };
 
 function dbRead(key, fallback) {
@@ -103,6 +105,53 @@ function getDanglingOpenEntries(employeeId, todayStr) {
   return getEntriesByEmployee(employeeId).filter(
     (e) => e.status === 'em_andamento' && e.date !== todayStr
   );
+}
+
+/* ---------------------- Sincronização de apontamentos ---------------------- */
+/* Cada apontamento concluído guarda um "syncedAt" (quando foi enviado com
+ * sucesso ao backend pela última vez). Fica pendente sempre que syncedAt
+ * estiver vazio ou for anterior a updatedAt (ex.: depois de uma edição). */
+
+function getUnsyncedEntries(employeeId) {
+  return getEntriesByEmployee(employeeId).filter(
+    (e) => e.status === 'concluido' && (!e.syncedAt || new Date(e.updatedAt) > new Date(e.syncedAt))
+  );
+}
+
+function markEntriesSynced(ids, timestamp) {
+  if (!ids.length) return;
+  const entries = getEntries();
+  ids.forEach((id) => {
+    const entry = entries.find((e) => e.id === id);
+    if (entry) entry.syncedAt = timestamp;
+  });
+  dbWrite(DB_KEYS.ENTRIES, entries);
+}
+
+function getPendingDeletes() {
+  return dbRead(DB_KEYS.PENDING_DELETES, []);
+}
+
+function addPendingDelete(entryId) {
+  const pending = getPendingDeletes();
+  if (!pending.includes(entryId)) {
+    pending.push(entryId);
+    dbWrite(DB_KEYS.PENDING_DELETES, pending);
+  }
+}
+
+function clearPendingDeletes(ids) {
+  if (!ids.length) return;
+  const pending = getPendingDeletes().filter((id) => !ids.includes(id));
+  dbWrite(DB_KEYS.PENDING_DELETES, pending);
+}
+
+function getLastEntriesSync() {
+  return dbRead(DB_KEYS.LAST_ENTRIES_SYNC, null);
+}
+
+function setLastEntriesSync(timestamp) {
+  dbWrite(DB_KEYS.LAST_ENTRIES_SYNC, timestamp);
 }
 
 /* ---------------------- Timer ativo ---------------------- */
@@ -203,6 +252,14 @@ window.DB = {
   saveEntry,
   deleteEntry,
   getDanglingOpenEntries,
+
+  getUnsyncedEntries,
+  markEntriesSynced,
+  getPendingDeletes,
+  addPendingDelete,
+  clearPendingDeletes,
+  getLastEntriesSync,
+  setLastEntriesSync,
 
   getActiveTimer,
   setActiveTimer,

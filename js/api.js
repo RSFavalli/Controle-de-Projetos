@@ -69,6 +69,8 @@ const Api = (() => {
     login: (email, senha) => call('login', { email, senha }),
     listClientes: (email, senha) => call('listClientes', { email, senha }),
     listProjetos: (email, senha) => call('listProjetos', { email, senha }),
+    syncApontamentos: (email, senha, entries, deletedIds) =>
+      call('syncApontamentos', { email, senha, entries, deletedIds }),
   };
 })();
 

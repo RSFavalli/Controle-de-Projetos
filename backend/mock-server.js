@@ -65,6 +65,7 @@ const db = {
     criado_em: new Date().toISOString(),
   })),
   projetos: [],
+  apontamentos: [],
 };
 
 /* ---------------------------------- Handlers ------------------------------------ */
@@ -165,6 +166,56 @@ function saveProjeto(input) {
   return novo;
 }
 
+function syncApontamentos(colaborador, entries, deletedIds) {
+  entries = entries || [];
+  deletedIds = deletedIds || [];
+
+  let syncedCount = 0;
+  entries.forEach((entry) => {
+    if (!entry || !entry.id) return;
+    const existing = db.apontamentos.find((a) => a.id === entry.id);
+    if (existing && existing.colaboradorId && existing.colaboradorId !== colaborador.id) {
+      throw new Error('Apontamento não pertence a este colaborador.');
+    }
+    const record = {
+      id: entry.id,
+      colaboradorId: colaborador.id,
+      colaboradorNome: colaborador.nome,
+      clienteId: entry.clienteId || '',
+      clienteNome: entry.clienteName || '',
+      projetoId: entry.projectId || '',
+      projetoNome: entry.projectName || '',
+      atividadeId: entry.activityId || '',
+      atividadeNome: entry.activityName || '',
+      data: entry.date || '',
+      horaInicio: entry.startTime || '',
+      horaFim: entry.endTime || '',
+      duracaoMinutos: entry.durationMinutes != null ? entry.durationMinutes : '',
+      observacoes: entry.observations || '',
+      criadoEm: entry.createdAt || '',
+      atualizadoEm: entry.updatedAt || '',
+      sincronizadoEm: new Date().toISOString(),
+    };
+    if (existing) {
+      Object.assign(existing, record);
+    } else {
+      db.apontamentos.push(record);
+    }
+    syncedCount++;
+  });
+
+  let deletedCount = 0;
+  deletedIds.forEach((id) => {
+    const idx = db.apontamentos.findIndex((a) => a.id === id);
+    if (idx !== -1 && (!db.apontamentos[idx].colaboradorId || db.apontamentos[idx].colaboradorId === colaborador.id)) {
+      db.apontamentos.splice(idx, 1);
+      deletedCount++;
+    }
+  });
+
+  return { synced: syncedCount, deleted: deletedCount };
+}
+
 /* ----------------------------------- Servidor ------------------------------------ */
 
 const server = http.createServer((req, res) => {
@@ -228,6 +279,11 @@ const server = http.createServer((req, res) => {
             requireAdmin(email, senha);
             data = saveProjeto(parsed.projeto);
             break;
+          case 'syncApontamentos': {
+            const session = requireAuth(email, senha);
+            data = syncApontamentos(session, parsed.entries, parsed.deletedIds);
+            break;
+          }
           default:
             throw new Error('Ação desconhecida: ' + action);
         }

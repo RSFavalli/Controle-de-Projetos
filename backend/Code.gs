@@ -10,6 +10,10 @@
  *   Colaboradores: id | nome | email | senha_hash | papel | ativo | criado_em
  *   Clientes:      id | nome | ativo | criado_em
  *   Projetos:      id | cliente_id | nome | ativo | criado_em
+ *   Apontamentos:  id | colaborador_id | colaborador_nome | cliente_id | cliente_nome |
+ *                  projeto_id | projeto_nome | atividade_id | atividade_nome | data |
+ *                  hora_inicio | hora_fim | duracao_minutos | observacoes | criado_em |
+ *                  atualizado_em | sincronizado_em
  *
  * "papel" em Colaboradores é "admin" ou "colaborador". Apenas quem tem
  * papel = admin consegue usar o Dashboard Admin.
@@ -21,11 +25,18 @@
 const SHEET_COLABORADORES = 'Colaboradores';
 const SHEET_CLIENTES = 'Clientes';
 const SHEET_PROJETOS = 'Projetos';
+const SHEET_APONTAMENTOS = 'Apontamentos';
 
 const HEADERS = {
   [SHEET_COLABORADORES]: ['id', 'nome', 'email', 'senha_hash', 'papel', 'ativo', 'criado_em'],
   [SHEET_CLIENTES]: ['id', 'nome', 'ativo', 'criado_em'],
   [SHEET_PROJETOS]: ['id', 'cliente_id', 'nome', 'ativo', 'criado_em'],
+  [SHEET_APONTAMENTOS]: [
+    'id', 'colaborador_id', 'colaborador_nome', 'cliente_id', 'cliente_nome',
+    'projeto_id', 'projeto_nome', 'atividade_id', 'atividade_nome', 'data',
+    'hora_inicio', 'hora_fim', 'duracao_minutos', 'observacoes',
+    'criado_em', 'atualizado_em', 'sincronizado_em',
+  ],
 };
 
 /* ========================================================================
@@ -94,6 +105,12 @@ function doPost(e) {
         data = saveProjeto(body.projeto);
         break;
 
+      case 'syncApontamentos': {
+        const session = requireAuth(body.email, body.senha);
+        data = syncApontamentos(session, body.entries, body.deletedIds);
+        break;
+      }
+
       default:
         throw new Error('Ação desconhecida: ' + action);
     }
@@ -112,22 +129,56 @@ function jsonOutput(obj) {
  * Autenticação
  * ==================================================================== */
 
+// Limite de tentativas de login por e-mail, para dificultar força bruta de
+// senha. Usa CacheService (memória temporária do próprio Apps Script, sem
+// precisar de aba na planilha) — os contadores somem sozinhos depois do
+// tempo de janela, não precisa de limpeza manual.
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOGIN_ATTEMPT_WINDOW_SECONDS = 15 * 60; // janela em que as tentativas erradas contam
+const LOGIN_LOCKOUT_SECONDS = 15 * 60; // tempo bloqueado depois de estourar o limite
+
 function login(email, senha) {
   if (!email || !senha) throw new Error('Informe e-mail e senha.');
+  const emailKey = String(email).toLowerCase();
+  const cache = CacheService.getScriptCache();
+
+  if (cache.get('login_lock_' + emailKey)) {
+    throw new Error('Muitas tentativas de login com este e-mail. Aguarde alguns minutos e tente novamente.');
+  }
+
   const colaborador = findColaboradorByEmail(email);
-  if (!colaborador) throw new Error('E-mail ou senha inválidos.');
+  if (!colaborador || colaborador.senha_hash !== hashPassword(senha)) {
+    registerFailedLogin(cache, emailKey);
+    throw new Error('E-mail ou senha inválidos.');
+  }
+
+  // Senha certa: limpa o histórico de tentativas erradas deste e-mail.
+  clearLoginAttempts(cache, emailKey);
+
   if (colaborador.ativo === false || colaborador.ativo === 'FALSE') {
     throw new Error('Este colaborador está inativo.');
   }
-  if (colaborador.senha_hash !== hashPassword(senha)) {
-    throw new Error('E-mail ou senha inválidos.');
-  }
+
   return {
     id: colaborador.id,
     nome: colaborador.nome,
     email: colaborador.email,
     papel: colaborador.papel,
   };
+}
+
+function registerFailedLogin(cache, emailKey) {
+  const attemptsKey = 'login_attempts_' + emailKey;
+  const attempts = Number(cache.get(attemptsKey) || '0') + 1;
+  cache.put(attemptsKey, String(attempts), LOGIN_ATTEMPT_WINDOW_SECONDS);
+  if (attempts >= MAX_LOGIN_ATTEMPTS) {
+    cache.put('login_lock_' + emailKey, '1', LOGIN_LOCKOUT_SECONDS);
+  }
+}
+
+function clearLoginAttempts(cache, emailKey) {
+  cache.remove('login_attempts_' + emailKey);
+  cache.remove('login_lock_' + emailKey);
 }
 
 /** Confere e-mail/senha e exige papel = admin. Lança erro se algo não bater. */
@@ -331,6 +382,87 @@ function saveProjeto(input) {
   };
   appendRow(sheet, novo);
   return { id: novo.id, clienteId: novo.cliente_id, nome: novo.nome, ativo: novo.ativo, criadoEm: novo.criado_em };
+}
+
+/* ========================================================================
+ * Apontamentos
+ * ==================================================================== */
+
+/**
+ * Recebe apontamentos concluídos do app de campo e grava/atualiza na aba
+ * Apontamentos (upsert por "id", que é gerado no próprio dispositivo).
+ * O colaborador_id/nome sempre vem de quem está autenticado nesta chamada
+ * (não do que o cliente mandou), para um colaborador não conseguir gravar
+ * apontamento em nome de outro.
+ */
+function syncApontamentos(colaborador, entries, deletedIds) {
+  entries = entries || [];
+  deletedIds = deletedIds || [];
+
+  const sheet = getSheet(SHEET_APONTAMENTOS);
+  const rows = sheetToObjects(SHEET_APONTAMENTOS);
+  const rowIndexById = {};
+  rows.forEach((r, i) => {
+    rowIndexById[r.id] = i;
+  });
+
+  let syncedCount = 0;
+  entries.forEach((entry) => {
+    if (!entry || !entry.id) return;
+    const existing = rows[rowIndexById[entry.id]];
+    if (existing && existing.colaborador_id && existing.colaborador_id !== colaborador.id) {
+      throw new Error('Apontamento não pertence a este colaborador.');
+    }
+
+    const record = {
+      id: entry.id,
+      colaborador_id: colaborador.id,
+      colaborador_nome: colaborador.nome,
+      cliente_id: entry.clienteId || '',
+      cliente_nome: entry.clienteName || '',
+      projeto_id: entry.projectId || '',
+      projeto_nome: entry.projectName || '',
+      atividade_id: entry.activityId || '',
+      atividade_nome: entry.activityName || '',
+      data: entry.date || '',
+      hora_inicio: entry.startTime || '',
+      hora_fim: entry.endTime || '',
+      duracao_minutos: entry.durationMinutes != null ? entry.durationMinutes : '',
+      observacoes: entry.observations || '',
+      criado_em: entry.createdAt || '',
+      atualizado_em: entry.updatedAt || '',
+      sincronizado_em: new Date().toISOString(),
+    };
+
+    if (existing) {
+      writeRow(sheet, rowIndexById[entry.id] + 2, record);
+    } else {
+      appendRow(sheet, record);
+    }
+    syncedCount++;
+  });
+
+  let deletedCount = 0;
+  if (deletedIds.length > 0) {
+    // Relê a planilha (entries acima podem ter acrescentado linhas) antes de excluir.
+    const freshRows = sheetToObjects(SHEET_APONTAMENTOS);
+    const rowNumbersToDelete = [];
+    deletedIds.forEach((id) => {
+      const idx = freshRows.findIndex((r) => r.id === id);
+      if (idx !== -1 && (!freshRows[idx].colaborador_id || freshRows[idx].colaborador_id === colaborador.id)) {
+        rowNumbersToDelete.push(idx + 2);
+      }
+    });
+    // Exclui de baixo para cima para não bagunçar os índices das próximas linhas.
+    rowNumbersToDelete
+      .sort((a, b) => b - a)
+      .forEach((rowNum) => {
+        sheet.deleteRow(rowNum);
+        deletedCount++;
+      });
+  }
+
+  return { synced: syncedCount, deleted: deletedCount };
 }
 
 /* ========================================================================
