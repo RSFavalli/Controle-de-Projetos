@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Timesheet - Apontamento de Horas</title>
+  <meta name="description" content="Sistema de apontamento de horas trabalhadas, offline-first." />
+  <meta name="theme-color" content="#1f6f54" />
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+  <!-- Barra de status de conexão / avisos -->
+  <div id="statusBar" class="status-bar" role="status" aria-live="polite">
+    <span id="connectionIndicator" class="connection-indicator">
+      <span class="dot"></span>
+      <span id="connectionText">Verificando conexão...</span>
+    </span>
+  </div>
+
+  <header class="app-header">
+    <div class="app-header__brand">
+      <span class="app-header__logo" aria-hidden="true">⏱</span>
+      <div>
+        <h1>Timesheet</h1>
+        <p class="app-header__subtitle">Apontamento de horas trabalhadas</p>
+      </div>
+    </div>
+
+    <div id="sessionInfo" class="app-header__session hidden">
+      <div class="app-header__session-text">
+        <strong id="sessionUserName"></strong>
+        <span id="syncStatus" class="sync-status"></span>
+      </div>
+      <button id="syncButton" class="btn btn--ghost btn--small">Sincronizar</button>
+      <button id="logoutButton" class="btn btn--ghost btn--small">Sair</button>
+    </div>
+  </header>
+
+  <main class="app-main">
+
+    <div id="toastArea" class="toast-area" aria-live="assertive"></div>
+
+    <!-- ------------------------- Tela de configuração da API ------------------------- -->
+    <section id="configScreen" class="card auth-card hidden">
+      <h2>Conectar ao servidor</h2>
+      <p class="muted">
+        Cole aqui a URL da API informada pelo administrador (a mesma usada no Dashboard Admin).
+      </p>
+      <form id="configForm" class="stacked-form">
+        <div class="field">
+          <label for="apiUrlInput">URL da API</label>
+          <input type="url" id="apiUrlInput" placeholder="https://script.google.com/macros/s/XXXX/exec" required />
+        </div>
+        <button type="submit" class="btn btn--start">Salvar e continuar</button>
+      </form>
+      <p id="configTestResult" class="config-test-result"></p>
+    </section>
+
+    <!-- ------------------------------- Tela de login ------------------------------- -->
+    <section id="loginScreen" class="card auth-card hidden">
+      <h2>Entrar</h2>
+      <p class="muted">Use o e-mail e senha cadastrados pelo administrador.</p>
+      <form id="loginForm" class="stacked-form">
+        <div class="field">
+          <label for="loginEmail">E-mail</label>
+          <input type="email" id="loginEmail" required autocomplete="username" />
+        </div>
+        <div class="field">
+          <label for="loginPassword">Senha</label>
+          <input type="password" id="loginPassword" required autocomplete="current-password" />
+        </div>
+        <button type="submit" class="btn btn--start">Entrar</button>
+      </form>
+      <p id="loginHint" class="muted login-hint"></p>
+      <button id="changeApiUrlButton" class="link-button">Trocar URL da API</button>
+    </section>
+
+    <!-- --------------------------- Reautenticação p/ sincronizar --------------------------- -->
+    <section id="reauthScreen" class="card auth-card hidden">
+      <h2>Confirmar senha</h2>
+      <p class="muted">Para sincronizar clientes e projetos com o servidor, confirme sua senha.</p>
+      <form id="reauthForm" class="stacked-form">
+        <div class="field">
+          <label for="reauthPassword">Senha</label>
+          <input type="password" id="reauthPassword" required autocomplete="current-password" />
+        </div>
+        <div class="inline-form__actions">
+          <button type="submit" class="btn btn--start">Confirmar</button>
+          <button type="button" id="cancelReauthButton" class="btn btn--ghost">Cancelar</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ------------------------------ App principal ------------------------------ -->
+    <div id="appScreen" class="app-screen hidden">
+
+      <!-- Alertas (ex.: apontamento aberto de outro dia) -->
+      <div id="alertsArea" class="alerts-area" aria-live="assertive"></div>
+
+      <!-- Cartão do cronômetro -->
+      <section class="card timer-card" aria-labelledby="timerHeading">
+        <h2 id="timerHeading">Cronômetro</h2>
+
+        <form id="timerForm" class="timer-form">
+          <div class="field-grid">
+            <div class="field">
+              <label for="clientSelect">Cliente</label>
+              <select id="clientSelect" required>
+                <option value="" disabled selected>Selecione o cliente</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="projectSelect">Projeto</label>
+              <select id="projectSelect" required disabled>
+                <option value="" disabled selected>Selecione o cliente primeiro</option>
+              </select>
+              <p class="field-hint">Não achou o projeto? Peça para o admin cadastrar no Dashboard.</p>
+            </div>
+
+            <div class="field">
+              <label for="activitySelect">Atividade</label>
+              <select id="activitySelect" required>
+                <option value="" disabled selected>Selecione a atividade</option>
+              </select>
+            </div>
+
+            <div class="field field--full">
+              <label for="observations">Observações</label>
+              <textarea id="observations" rows="2" placeholder="Opcional"></textarea>
+            </div>
+          </div>
+
+          <div class="timer-display" aria-live="polite">
+            <span id="timerClock">00:00:00</span>
+            <span id="timerRunningInfo" class="timer-running-info hidden"></span>
+          </div>
+
+          <div class="timer-actions">
+            <button type="button" id="startButton" class="btn btn--start">Iniciar</button>
+            <button type="button" id="stopButton" class="btn btn--stop" disabled>Encerrar</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Apontamentos do dia -->
+      <section class="card entries-card" aria-labelledby="entriesHeading">
+        <div class="entries-card__header">
+          <h2 id="entriesHeading">Apontamentos de hoje</h2>
+          <div class="entries-card__header-right">
+            <span id="entriesSyncStatus" class="entries-card__sync-status"></span>
+            <span id="todayTotal" class="entries-card__total">Total: 00:00</span>
+          </div>
+        </div>
+
+        <form id="editEntryForm" class="edit-entry-form hidden">
+          <h3>Editar apontamento</h3>
+          <input type="hidden" id="editEntryId" />
+          <div class="field-grid">
+            <div class="field">
+              <label for="editEntryClient">Cliente</label>
+              <select id="editEntryClient" required></select>
+            </div>
+            <div class="field">
+              <label for="editEntryProject">Projeto</label>
+              <select id="editEntryProject" required></select>
+            </div>
+            <div class="field">
+              <label for="editEntryActivity">Atividade</label>
+              <select id="editEntryActivity" required></select>
+            </div>
+            <div class="field">
+              <label for="editEntryStart">Início</label>
+              <input type="time" id="editEntryStart" required />
+            </div>
+            <div class="field">
+              <label for="editEntryEnd">Fim</label>
+              <input type="time" id="editEntryEnd" required />
+            </div>
+            <div class="field field--full">
+              <label for="editEntryObservations">Observações</label>
+              <textarea id="editEntryObservations" rows="2" placeholder="Opcional"></textarea>
+            </div>
+          </div>
+          <div class="inline-form__actions">
+            <button type="submit" class="btn btn--start btn--small">Salvar</button>
+            <button type="button" id="cancelEditEntryButton" class="btn btn--ghost btn--small">Cancelar</button>
+          </div>
+        </form>
+
+        <div class="table-wrapper">
+          <table class="entries-table">
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Projeto</th>
+                <th>Atividade</th>
+                <th>Início</th>
+                <th>Fim</th>
+                <th>Duração</th>
+                <th>Observações</th>
+                <th aria-label="Ações"></th>
+              </tr>
+            </thead>
+            <tbody id="entriesTableBody">
+              <!-- Preenchido via JS -->
+            </tbody>
+          </table>
+          <p id="entriesEmptyState" class="empty-state hidden">
+            Nenhum apontamento registrado hoje ainda.
+          </p>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <footer class="app-footer">
+    <p>Dados salvos localmente neste dispositivo (funciona offline). Clientes e projetos vêm do servidor e ficam em cache local.</p>
+  </footer>
+
+  <!-- Dados mestres e camada de persistência -->
+  <script src="js/data.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/timer.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
