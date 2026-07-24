@@ -398,6 +398,80 @@ select, input[type="text"], input[type="email"], input[type="password"], input[t
   text-align: center;
 }
 
+/* ---------------------- Filtro de horas ---------------------- */
+
+.horas-filtro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+}
+
+.horas-filtro .field { flex: 1 1 160px; min-width: 140px; }
+
+.horas-filtro select,
+.horas-filtro input[type="date"] {
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.85rem;
+}
+
+/* ---------------------- Gráfico de pizza do departamento ---------------------- */
+
+.departamento-chart-container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+.departamento-chart__svg-wrap { flex: 0 0 auto; }
+
+.departamento-chart__legend {
+  flex: 1 1 240px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.departamento-chart__legend-row {
+  display: grid;
+  grid-template-columns: 12px 1fr auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.85rem;
+}
+
+.departamento-chart__legend-row i {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.departamento-chart__legend-name { color: var(--color-text); }
+
+.departamento-chart__legend-pct {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-primary-dark);
+  min-width: 3.2em;
+  text-align: right;
+}
+
+.departamento-chart__legend-hours {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 4.5em;
+  text-align: right;
+}
+
+.departamento-chart__slice { transition: opacity 0.1s ease; }
+.departamento-chart__slice:hover { opacity: 0.85; }
+
 /* ---------------------- Gráfico de horas por atividade ---------------------- */
 
 .horas-chart-container {

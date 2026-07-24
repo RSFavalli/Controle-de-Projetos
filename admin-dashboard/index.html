@@ -169,6 +169,10 @@
               <option value="admin">Administrador</option>
             </select>
           </div>
+          <div class="field">
+            <label for="colaboradorCargo">Cargo</label>
+            <input type="text" id="colaboradorCargo" placeholder="Ex.: Consultor Sênior (opcional)" />
+          </div>
           <div class="field field--checkbox">
             <label><input type="checkbox" id="colaboradorAtivo" checked /> Ativo</label>
           </div>
@@ -181,7 +185,7 @@
         <div class="table-wrapper">
           <table class="data-table">
             <thead>
-              <tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Status</th><th></th></tr>
+              <tr><th>Nome</th><th>E-mail</th><th>Cargo</th><th>Perfil</th><th>Status</th><th></th></tr>
             </thead>
             <tbody id="colaboradoresTableBody"></tbody>
           </table>
@@ -227,8 +231,37 @@
           <p id="conformidadeEmptyState" class="empty-state hidden">Nenhum colaborador ativo cadastrado ainda.</p>
         </div>
 
-        <h3 class="section-subheading">Distribuição de horas por atividade</h3>
-        <p id="horasChartEmptyState" class="empty-state hidden">Nenhum apontamento concluído no período selecionado.</p>
+        <h3 class="section-subheading">Filtrar horas por período, cliente e projeto</h3>
+        <form id="horasFiltroForm" class="horas-filtro">
+          <div class="field">
+            <label for="horasFiltroDe">De</label>
+            <input type="date" id="horasFiltroDe" />
+          </div>
+          <div class="field">
+            <label for="horasFiltroAte">Até</label>
+            <input type="date" id="horasFiltroAte" />
+          </div>
+          <div class="field">
+            <label for="horasFiltroCliente">Cliente</label>
+            <select id="horasFiltroCliente">
+              <option value="">Todos os clientes</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="horasFiltroProjeto">Projeto</label>
+            <select id="horasFiltroProjeto">
+              <option value="">Todos os projetos</option>
+            </select>
+          </div>
+          <button type="button" class="btn btn--ghost btn--small" id="limparFiltroHorasButton">Limpar filtros</button>
+        </form>
+
+        <h3 class="section-subheading">Distribuição de horas do departamento</h3>
+        <p id="departamentoChartEmptyState" class="empty-state hidden">Nenhum apontamento concluído no período/filtro selecionado.</p>
+        <div id="departamentoChartContainer" class="departamento-chart-container"></div>
+
+        <h3 class="section-subheading">Distribuição de horas por colaborador</h3>
+        <p id="horasChartEmptyState" class="empty-state hidden">Nenhum apontamento concluído no período/filtro selecionado.</p>
         <div id="horasChartContainer" class="horas-chart-container"></div>
       </section>
 

@@ -75,7 +75,9 @@ timesheet-app/
 - **Edição de apontamentos**: qualquer apontamento concluído do dia pode ser corrigido (Cliente, Projeto, Atividade, Início, Fim, Observações) pelo botão "Editar" na lista "Apontamentos de hoje".
 - **Sincronização de apontamentos**: apontamentos sobem sozinhos para a planilha (login, reconexão, logo após iniciar/encerrar/editar/excluir um apontamento, e também pelo botão "Sincronizar") — inclusive os que ainda estão em andamento, para o Dashboard enxergar em tempo real quem está com algo em aberto. Um indicador ao lado do total mostra quantos ainda estão pendentes de envio. Exclusão de um apontamento já sincronizado também remove a linha correspondente na planilha.
 - **Painel de conformidade e alertas por e-mail** (Dashboard → aba Apontamentos): verificação automática (baseada em regras, não em IA generativa) de quem deixou de apontar ou de fechar uma atividade num dia útil — considerando fins de semana e feriados nacionais + municipais de Paulínia/SP. Manda lembrete automático por e-mail todo fim de dia útil, e permite reforço manual pelo Dashboard com base na frequência de pendências de cada colaborador. Respostas dos colaboradores caem no e-mail do admin.
-- **Gráfico de horas por atividade** (mesma aba): barras horizontais empilhadas, uma por colaborador, mostrando a distribuição de horas entre as 6 atividades no período selecionado.
+- **Gráfico de horas por atividade** (mesma aba): barras horizontais empilhadas, uma por colaborador, com horas e percentual de cada atividade. Ao lado, um gráfico de pizza (rosca) soma as horas de **todos** os colaboradores por atividade — visão do departamento como um todo.
+- **Filtros de horas** (período, cliente, projeto): os dois gráficos acima podem ser recortados por data, cliente e/ou projeto, para ver quanto tempo foi investido em cada frente específica.
+- **Campo Cargo** nos colaboradores (opcional) — para futuramente agrupar horas por função além de por pessoa.
 
 ## O que falta (próximas etapas)
 

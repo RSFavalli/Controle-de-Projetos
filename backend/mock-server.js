@@ -106,6 +106,7 @@ function saveColaborador(input) {
     existing.email = input.email;
     if (input.senha) existing.senha_hash = hashPassword(input.senha);
     existing.papel = input.papel;
+    existing.cargo = input.cargo !== undefined ? input.cargo : existing.cargo || '';
     existing.ativo = input.ativo !== undefined ? input.ativo : existing.ativo;
     const { senha_hash, ...rest } = existing;
     return rest;
@@ -120,6 +121,7 @@ function saveColaborador(input) {
     email: input.email,
     senha_hash: hashPassword(input.senha),
     papel: input.papel,
+    cargo: input.cargo || '',
     ativo: input.ativo !== undefined ? input.ativo : true,
     criado_em: new Date().toISOString(),
   };

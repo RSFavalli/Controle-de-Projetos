@@ -72,6 +72,7 @@
     colaboradorEmail: document.getElementById('colaboradorEmail'),
     colaboradorSenha: document.getElementById('colaboradorSenha'),
     colaboradorPapel: document.getElementById('colaboradorPapel'),
+    colaboradorCargo: document.getElementById('colaboradorCargo'),
     colaboradorAtivo: document.getElementById('colaboradorAtivo'),
     cancelColaboradorButton: document.getElementById('cancelColaboradorButton'),
     colaboradoresTableBody: document.getElementById('colaboradoresTableBody'),
@@ -82,6 +83,13 @@
     refreshApontamentosButton: document.getElementById('refreshApontamentosButton'),
     conformidadeTableBody: document.getElementById('conformidadeTableBody'),
     conformidadeEmptyState: document.getElementById('conformidadeEmptyState'),
+    horasFiltroDe: document.getElementById('horasFiltroDe'),
+    horasFiltroAte: document.getElementById('horasFiltroAte'),
+    horasFiltroCliente: document.getElementById('horasFiltroCliente'),
+    horasFiltroProjeto: document.getElementById('horasFiltroProjeto'),
+    limparFiltroHorasButton: document.getElementById('limparFiltroHorasButton'),
+    departamentoChartContainer: document.getElementById('departamentoChartContainer'),
+    departamentoChartEmptyState: document.getElementById('departamentoChartEmptyState'),
     horasChartContainer: document.getElementById('horasChartContainer'),
     horasChartEmptyState: document.getElementById('horasChartEmptyState'),
   };
@@ -134,7 +142,21 @@
 
     // Apontamentos
     els.refreshApontamentosButton.addEventListener('click', () => loadApontamentos());
-    els.apontamentosRangeSelect.addEventListener('change', () => loadApontamentos());
+    els.apontamentosRangeSelect.addEventListener('change', () => renderConformidade());
+    els.horasFiltroDe.addEventListener('change', () => renderCharts());
+    els.horasFiltroAte.addEventListener('change', () => renderCharts());
+    els.horasFiltroCliente.addEventListener('change', () => {
+      populateHorasFiltroProjetoSelect();
+      renderCharts();
+    });
+    els.horasFiltroProjeto.addEventListener('change', () => renderCharts());
+    els.limparFiltroHorasButton.addEventListener('click', () => {
+      els.horasFiltroDe.value = '';
+      els.horasFiltroAte.value = '';
+      els.horasFiltroCliente.value = '';
+      populateHorasFiltroProjetoSelect();
+      renderCharts();
+    });
   }
 
   function showScreen(name) {
@@ -234,6 +256,8 @@
       renderProjetos();
       renderColaboradores();
       populateProjetoClienteSelect();
+      populateHorasFiltroClienteSelect();
+      populateHorasFiltroProjetoSelect();
     } catch (err) {
       if (isAuthError(err)) {
         toast('Sessão expirada ou inválida. Faça login novamente.', 'error');
@@ -423,6 +447,7 @@
       els.colaboradorNome.value = colaborador.nome;
       els.colaboradorEmail.value = colaborador.email;
       els.colaboradorPapel.value = colaborador.papel;
+      els.colaboradorCargo.value = colaborador.cargo || '';
       els.colaboradorAtivo.checked = colaborador.ativo;
       els.colaboradorSenha.placeholder = 'Deixe em branco para manter a atual';
     } else {
@@ -430,6 +455,7 @@
       els.colaboradorNome.value = '';
       els.colaboradorEmail.value = '';
       els.colaboradorPapel.value = 'colaborador';
+      els.colaboradorCargo.value = '';
       els.colaboradorAtivo.checked = true;
       els.colaboradorSenha.placeholder = 'Senha inicial';
     }
@@ -444,6 +470,7 @@
       nome: els.colaboradorNome.value.trim(),
       email: els.colaboradorEmail.value.trim(),
       papel: els.colaboradorPapel.value,
+      cargo: els.colaboradorCargo.value.trim(),
       ativo: els.colaboradorAtivo.checked,
     };
     if (els.colaboradorSenha.value) {
@@ -475,6 +502,7 @@
         tr.innerHTML = `
           <td>${escapeHtml(colaborador.nome)}</td>
           <td>${escapeHtml(colaborador.email)}</td>
+          <td>${escapeHtml(colaborador.cargo || '—')}</td>
           <td>${colaborador.papel === 'admin' ? '<span class="role-pill">Admin</span>' : 'Colaborador'}</td>
           <td>${statusPill(colaborador.ativo)}</td>
           <td></td>
@@ -494,15 +522,14 @@
   /* ------------------------------- Apontamentos ------------------------------- */
 
   async function loadApontamentos() {
-    const dias = Number(els.apontamentosRangeSelect.value);
-    const businessDays = Holidays.lastBusinessDays(dias);
-    const desde = businessDays[0];
-
     try {
-      const apontamentos = await Api.listApontamentos(state.session, desde, undefined);
+      // Busca tudo de uma vez (a equipe é pequena, não compensa a complexidade
+      // de paginar por período) — os filtros de tela recortam em cima disso,
+      // sem precisar de uma chamada nova ao servidor a cada mudança de filtro.
+      const apontamentos = await Api.listApontamentos(state.session, undefined, undefined);
       state.apontamentos = apontamentos;
-      renderConformidade(businessDays);
-      renderHorasChart(apontamentos);
+      renderConformidade();
+      renderCharts();
     } catch (err) {
       if (isAuthError(err)) {
         toast('Sessão expirada ou inválida. Faça login novamente.', 'error');
@@ -513,7 +540,62 @@
     }
   }
 
-  function renderConformidade(businessDays) {
+  function populateHorasFiltroClienteSelect() {
+    const current = els.horasFiltroCliente.value;
+    els.horasFiltroCliente.innerHTML = '<option value="">Todos os clientes</option>';
+    state.clientes
+      .slice()
+      .sort((a, b) => a.nome.localeCompare(b.nome))
+      .forEach((c) => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.nome;
+        els.horasFiltroCliente.appendChild(opt);
+      });
+    els.horasFiltroCliente.value = current;
+  }
+
+  function populateHorasFiltroProjetoSelect() {
+    const clienteId = els.horasFiltroCliente.value;
+    const current = els.horasFiltroProjeto.value;
+    els.horasFiltroProjeto.innerHTML = '<option value="">Todos os projetos</option>';
+    state.projetos
+      .filter((p) => !clienteId || p.clienteId === clienteId)
+      .slice()
+      .sort((a, b) => a.nome.localeCompare(b.nome))
+      .forEach((p) => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.nome;
+        els.horasFiltroProjeto.appendChild(opt);
+      });
+    const stillValid = Array.from(els.horasFiltroProjeto.options).some((o) => o.value === current);
+    els.horasFiltroProjeto.value = stillValid ? current : '';
+  }
+
+  function getFilteredApontamentosParaGraficos() {
+    const de = els.horasFiltroDe.value;
+    const ate = els.horasFiltroAte.value;
+    const clienteId = els.horasFiltroCliente.value;
+    const projetoId = els.horasFiltroProjeto.value;
+    return state.apontamentos.filter((a) => {
+      if (de && a.data < de) return false;
+      if (ate && a.data > ate) return false;
+      if (clienteId && a.clienteId !== clienteId) return false;
+      if (projetoId && a.projetoId !== projetoId) return false;
+      return true;
+    });
+  }
+
+  function renderCharts() {
+    const filtrados = getFilteredApontamentosParaGraficos();
+    renderDepartamentoChart(filtrados);
+    renderHorasChart(filtrados);
+  }
+
+  function renderConformidade() {
+    const dias = Number(els.apontamentosRangeSelect.value);
+    const businessDays = Holidays.lastBusinessDays(dias);
     const hoje = Holidays.dateStr(new Date());
     const ativos = state.colaboradores.filter((c) => c.ativo);
 
@@ -633,15 +715,17 @@
       activities.forEach((act, i) => {
         const minutos = linha.porAtividade[act.id];
         if (!minutos) return;
+        const fracao = minutos / linha.total;
+        const pct = formatPct(fracao);
         const segment = document.createElement('div');
         segment.className = 'horas-chart__segment';
         segment.style.background = colorFor(i);
-        segment.style.flexBasis = `${(minutos / linha.total) * 100}%`;
-        segment.title = `${linha.nome} — ${act.name}: ${formatHm(minutos)}`;
-        if (minutos / linha.total > 0.12) {
+        segment.style.flexBasis = `${fracao * 100}%`;
+        segment.title = `${linha.nome} — ${act.name}: ${formatHm(minutos)} (${pct})`;
+        if (fracao > 0.12) {
           const segLabel = document.createElement('span');
           segLabel.className = 'horas-chart__segment-label';
-          segLabel.textContent = formatHm(minutos);
+          segLabel.textContent = `${formatHm(minutos)} · ${pct}`;
           segment.appendChild(segLabel);
         }
         track.appendChild(segment);
@@ -654,6 +738,109 @@
 
     els.horasChartContainer.appendChild(legend);
     els.horasChartContainer.appendChild(rows);
+  }
+
+  /** Gráfico de pizza (donut) com as horas de TODOS os colaboradores somadas
+   * por atividade — visão do departamento como um todo, respeitando os
+   * mesmos filtros de período/cliente/projeto do gráfico por colaborador. */
+  function renderDepartamentoChart(apontamentos) {
+    const concluidos = apontamentos.filter((a) => a.duracaoMinutos != null && a.duracaoMinutos > 0);
+    els.departamentoChartEmptyState.classList.toggle('hidden', concluidos.length > 0);
+    els.departamentoChartContainer.innerHTML = '';
+    if (concluidos.length === 0) return;
+
+    const activities = window.APP_DATA.ACTIVITIES;
+    const colorFor = (index) => `var(--activity-${index + 1})`;
+
+    const porAtividade = {};
+    let totalGeral = 0;
+    concluidos.forEach((a) => {
+      porAtividade[a.atividadeId] = (porAtividade[a.atividadeId] || 0) + a.duracaoMinutos;
+      totalGeral += a.duracaoMinutos;
+    });
+
+    const fatias = activities
+      .map((act, i) => ({ act, color: colorFor(i), minutos: porAtividade[act.id] || 0 }))
+      .filter((f) => f.minutos > 0)
+      .sort((a, b) => b.minutos - a.minutos);
+
+    const size = 200;
+    const cx = size / 2;
+    const cy = size / 2;
+    const rOuter = 90;
+    const rInner = 50;
+
+    const svgParts = [];
+    if (fatias.length === 1) {
+      // Uma atividade só = 100% — um arco não representa um círculo cheio,
+      // desenha como anel completo (dois círculos concêntricos).
+      const f = fatias[0];
+      svgParts.push(`<circle cx="${cx}" cy="${cy}" r="${rOuter}" fill="${f.color}"><title>${escapeHtml(f.act.name)}: ${formatHm(f.minutos)} (100%)</title></circle>`);
+      svgParts.push(`<circle cx="${cx}" cy="${cy}" r="${rInner}" fill="var(--color-surface)"/>`);
+    } else {
+      let anguloAtual = -90; // começa no topo (12h), sentido horário
+      fatias.forEach((f) => {
+        const fracao = f.minutos / totalGeral;
+        const anguloInicio = anguloAtual;
+        const anguloFim = anguloAtual + fracao * 360;
+        anguloAtual = anguloFim;
+        const d = donutSlicePath(cx, cy, rOuter, rInner, anguloInicio, anguloFim);
+        svgParts.push(
+          `<path class="departamento-chart__slice" d="${d}" fill="${f.color}" stroke="var(--color-surface)" stroke-width="2">` +
+            `<title>${escapeHtml(f.act.name)}: ${formatHm(f.minutos)} (${formatPct(fracao)})</title>` +
+            `</path>`
+        );
+      });
+    }
+
+    const svgWrap = document.createElement('div');
+    svgWrap.className = 'departamento-chart__svg-wrap';
+    svgWrap.innerHTML = `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" role="img" aria-label="Distribuição de horas do departamento por atividade">${svgParts.join('')}</svg>`;
+
+    const legend = document.createElement('div');
+    legend.className = 'departamento-chart__legend';
+    fatias.forEach((f) => {
+      const row = document.createElement('div');
+      row.className = 'departamento-chart__legend-row';
+      row.innerHTML = `
+        <i style="background:${f.color}"></i>
+        <span class="departamento-chart__legend-name">${escapeHtml(f.act.name)}</span>
+        <span class="departamento-chart__legend-hours">${formatHm(f.minutos)}</span>
+        <span class="departamento-chart__legend-pct">${formatPct(f.minutos / totalGeral)}</span>
+      `;
+      legend.appendChild(row);
+    });
+
+    els.departamentoChartContainer.appendChild(svgWrap);
+    els.departamentoChartContainer.appendChild(legend);
+  }
+
+  /** Caminho SVG de uma fatia de anel (donut) entre dois ângulos, em graus. */
+  function donutSlicePath(cx, cy, rOuter, rInner, startAngleDeg, endAngleDeg) {
+    const toRad = (deg) => (deg * Math.PI) / 180;
+    const largeArc = endAngleDeg - startAngleDeg > 180 ? 1 : 0;
+
+    const x1o = cx + rOuter * Math.cos(toRad(startAngleDeg));
+    const y1o = cy + rOuter * Math.sin(toRad(startAngleDeg));
+    const x2o = cx + rOuter * Math.cos(toRad(endAngleDeg));
+    const y2o = cy + rOuter * Math.sin(toRad(endAngleDeg));
+
+    const x1i = cx + rInner * Math.cos(toRad(endAngleDeg));
+    const y1i = cy + rInner * Math.sin(toRad(endAngleDeg));
+    const x2i = cx + rInner * Math.cos(toRad(startAngleDeg));
+    const y2i = cy + rInner * Math.sin(toRad(startAngleDeg));
+
+    return [
+      `M ${x1o} ${y1o}`,
+      `A ${rOuter} ${rOuter} 0 ${largeArc} 1 ${x2o} ${y2o}`,
+      `L ${x1i} ${y1i}`,
+      `A ${rInner} ${rInner} 0 ${largeArc} 0 ${x2i} ${y2i}`,
+      'Z',
+    ].join(' ');
+  }
+
+  function formatPct(fracao) {
+    return `${Math.round(fracao * 1000) / 10}%`;
   }
 
   function formatHm(totalMinutes) {

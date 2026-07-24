@@ -7,7 +7,7 @@
  * Abas esperadas na planilha (crie-as com esses nomes EXATOS, ou rode
  * a função seedDatabase() uma vez, que cria tudo automaticamente):
  *
- *   Colaboradores: id | nome | email | senha_hash | papel | ativo | criado_em
+ *   Colaboradores: id | nome | email | senha_hash | papel | cargo | ativo | criado_em
  *   Clientes:      id | nome | ativo | criado_em
  *   Projetos:      id | cliente_id | nome | ativo | criado_em
  *   Apontamentos:  id | colaborador_id | colaborador_nome | cliente_id | cliente_nome |
@@ -37,7 +37,7 @@ const ADMIN_EMAIL = 'rafael.favalli@agricef.com.br';
 const APP_URL = 'https://rsfavalli.github.io/Controle-de-Projetos/';
 
 const HEADERS = {
-  [SHEET_COLABORADORES]: ['id', 'nome', 'email', 'senha_hash', 'papel', 'ativo', 'criado_em'],
+  [SHEET_COLABORADORES]: ['id', 'nome', 'email', 'senha_hash', 'papel', 'cargo', 'ativo', 'criado_em'],
   [SHEET_CLIENTES]: ['id', 'nome', 'ativo', 'criado_em'],
   [SHEET_PROJETOS]: ['id', 'cliente_id', 'nome', 'ativo', 'criado_em'],
   [SHEET_APONTAMENTOS]: [
@@ -241,11 +241,13 @@ function getSalt() {
  * ==================================================================== */
 
 function listColaboradores() {
+  ensureHeaders(SHEET_COLABORADORES);
   return sheetToObjects(SHEET_COLABORADORES).map((c) => ({
     id: c.id,
     nome: c.nome,
     email: c.email,
     papel: c.papel,
+    cargo: c.cargo || '',
     ativo: normalizeBool(c.ativo),
     criadoEm: c.criado_em,
     // senha_hash nunca é devolvida ao front-end.
@@ -260,6 +262,7 @@ function saveColaborador(input) {
     throw new Error('Papel inválido (use "admin" ou "colaborador").');
   }
 
+  ensureHeaders(SHEET_COLABORADORES);
   const sheet = getSheet(SHEET_COLABORADORES);
   const rows = sheetToObjects(SHEET_COLABORADORES);
 
@@ -278,6 +281,7 @@ function saveColaborador(input) {
       email: input.email,
       senha_hash: input.senha ? hashPassword(input.senha) : existing.senha_hash,
       papel: input.papel,
+      cargo: input.cargo !== undefined ? input.cargo : existing.cargo || '',
       ativo: input.ativo !== undefined ? input.ativo : normalizeBool(existing.ativo),
       criado_em: existing.criado_em,
     };
@@ -296,6 +300,7 @@ function saveColaborador(input) {
     email: input.email,
     senha_hash: hashPassword(input.senha),
     papel: input.papel,
+    cargo: input.cargo || '',
     ativo: input.ativo !== undefined ? input.ativo : true,
     criado_em: new Date().toISOString(),
   };
