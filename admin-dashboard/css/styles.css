@@ -31,6 +31,16 @@
   --space-5: 24px;
   --space-6: 32px;
 
+  /* Paleta categórica (validada para daltonismo) para as 6 atividades fixas do
+     app de campo, sempre na mesma ordem — cor identifica a atividade, nunca a
+     posição/ranking. */
+  --activity-1: #2a78d6;
+  --activity-2: #eb6834;
+  --activity-3: #1baf7a;
+  --activity-4: #eda100;
+  --activity-5: #e87ba4;
+  --activity-6: #008300;
+
   font-size: 16px;
 }
 
@@ -265,6 +275,34 @@ select, input[type="text"], input[type="email"], input[type="password"], input[t
 
 .panel-header h2 { margin: 0; }
 
+.panel-header__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.panel-header__controls select {
+  width: auto;
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.85rem;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.section-subheading {
+  margin: var(--space-5) 0 var(--space-2);
+  font-size: 0.95rem;
+  color: var(--color-primary-dark);
+}
+.section-subheading:first-of-type { margin-top: 0; }
+
 .inline-form {
   display: grid;
   grid-template-columns: 1fr;
@@ -326,6 +364,12 @@ select, input[type="text"], input[type="email"], input[type="password"], input[t
   color: var(--color-warning);
 }
 
+/* Status semântico (conformidade de apontamento) — paleta fixa, nunca reaproveitada
+   para outra coisa, sempre acompanhada de ícone + texto (nunca só a cor). */
+.status-pill--good { background: #e3f7e3; color: #0ca30c; }
+.status-pill--warning { background: #fdf0d9; color: #8a6d1a; }
+.status-pill--critical { background: #fbe3e3; color: #b3271f; }
+
 .row-actions { display: flex; gap: var(--space-2); }
 
 .row-actions button {
@@ -352,6 +396,102 @@ select, input[type="text"], input[type="email"], input[type="password"], input[t
   font-size: 0.78rem;
   color: var(--color-text-muted);
   text-align: center;
+}
+
+/* ---------------------- Gráfico de horas por atividade ---------------------- */
+
+.horas-chart-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.horas-chart__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.horas-chart__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.horas-chart__legend-item i {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.horas-chart__rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.horas-chart__row {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.horas-chart__label {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.horas-chart__name {
+  font-weight: 600;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.horas-chart__total {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.horas-chart__track {
+  display: flex;
+  height: 24px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+}
+
+.horas-chart__segment {
+  position: relative;
+  min-width: 3px;
+  border-right: 2px solid var(--color-surface);
+  transition: opacity 0.1s ease;
+}
+.horas-chart__segment:last-child { border-right: none; }
+.horas-chart__segment:hover { opacity: 0.85; }
+
+.horas-chart__segment-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 @media (min-width: 640px) {

@@ -2,7 +2,7 @@
 
 Passo a passo para colocar a API no ar. Leva uns 10 minutos, tudo feito na sua conta Google — eu não tenho acesso a essa conta, então esses passos precisam ser feitos por você.
 
-> **Já configurou antes e está atualizando o `Code.gs`?** A versão atual libera a leitura de Clientes/Projetos (`listClientes`/`listProjetos`) para qualquer colaborador autenticado, não só admin — é o que o app de campo usa para carregar essas listas. Também adiciona a aba **Apontamentos** (usada pela sincronização dos registros de horas do app de campo) e um **limite de tentativas de login** (bloqueia por 15 min um e-mail depois de 5 senhas erradas seguidas, para dificultar força bruta). Cole o `Code.gs` novo por cima do antigo (passo 2), **rode `seedDatabase` de novo** (passo 4 — é seguro rodar mais de uma vez, só cria o que ainda não existe) para criar a aba Apontamentos, e **implante uma nova versão** (passo 6 tem o caminho: Implantar → Gerenciar implantações → ícone de lápis → Nova versão → Implantar). A URL do Web App continua a mesma.
+> **Já configurou antes e está atualizando o `Code.gs`?** A versão atual libera a leitura de Clientes/Projetos (`listClientes`/`listProjetos`) para qualquer colaborador autenticado, não só admin — é o que o app de campo usa para carregar essas listas. Também adiciona a aba **Apontamentos** (usada pela sincronização dos registros de horas do app de campo), um **limite de tentativas de login** (bloqueia por 15 min um e-mail depois de 5 senhas erradas seguidas) e os **alertas de apontamento por e-mail** (lembrete diário automático + reforço manual pelo Dashboard — veja o passo 9). Cole o `Code.gs` novo por cima do antigo (passo 2), **rode `seedDatabase` de novo** (passo 4 — é seguro rodar mais de uma vez, só cria o que ainda não existe) para criar a aba Apontamentos, **rode `configurarAlertaDiario` uma vez** (passo 9) para ligar o lembrete automático, e **implante uma nova versão** (passo 6 tem o caminho: Implantar → Gerenciar implantações → ícone de lápis → Nova versão → Implantar). A URL do Web App continua a mesma.
 
 ## 1. Criar a planilha
 
@@ -71,6 +71,24 @@ Os dois usam a mesma URL do Web App (passo 6):
 1. **Dashboard Admin** (`admin-dashboard/index.html`): na tela inicial, cole a URL e salve; faça login com o e-mail e senha (`mudar123`) da pessoa marcada como `admin` no passo 5; troque essa senha assim que possível pela tela de Colaboradores.
 2. **App de campo** (`index.html`, na raiz do projeto): mesma coisa — cole a URL na tela inicial, depois faça login com o e-mail/senha de qualquer colaborador (não precisa ser admin). Depois do primeiro login com internet, essa pessoa consegue logar de novo nesse mesmo aparelho mesmo sem conexão.
 3. Cadastre ao menos um Cliente e um Projeto pelo Dashboard Admin antes de testar o cronômetro no app de campo — sem isso, os selects de Cliente/Projeto aparecem vazios.
+
+## 9. Ativar os alertas de apontamento por e-mail
+
+O sistema manda dois tipos de e-mail para os colaboradores, sempre pela conta que publicou o script (a mesma do passo 6):
+
+- **Lembrete diário automático**: todo fim de dia útil (por volta das 19h, sem contar fins de semana e feriados nacionais/de Paulínia-SP), quem não apontou nada ou deixou uma atividade em aberto recebe um e-mail sozinho.
+- **Reforço manual**: pela aba **Apontamentos** do Dashboard, você vê a frequência de pendências de cada colaborador e pode mandar um e-mail de cobrança na hora, com uma mensagem sua opcional.
+
+Nos dois casos, se o colaborador **responder o e-mail**, a resposta cai em `rafael.favalli@agricef.com.br` (constante `ADMIN_EMAIL` no topo do `Code.gs` — troque ali se precisar apontar para outro e-mail).
+
+Para ligar o lembrete automático (só precisa fazer isso **uma vez**):
+
+1. No editor do Apps Script, no menu suspenso de funções (o mesmo do passo 4), selecione `configurarAlertaDiario`.
+2. Clique em **Executar**.
+3. Na primeira vez, o Google vai pedir autorização de novo — dessa vez para **enviar e-mail em seu nome**. Revise e permita, do mesmo jeito do passo 4.
+4. Pronto — o gatilho fica ativo mesmo com o editor fechado. Para conferir, vá no ícone de relógio (**Gatilhos**) na barra lateral esquerda do editor: deve aparecer `enviarAlertasDiarios` rodando todo dia.
+
+É seguro rodar `configurarAlertaDiario` de novo no futuro (ex.: se quiser mudar o horário no código) — ele substitui o gatilho antigo, não duplica.
 
 ## Sempre que você editar o Code.gs
 

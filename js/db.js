@@ -108,13 +108,18 @@ function getDanglingOpenEntries(employeeId, todayStr) {
 }
 
 /* ---------------------- Sincronização de apontamentos ---------------------- */
-/* Cada apontamento concluído guarda um "syncedAt" (quando foi enviado com
- * sucesso ao backend pela última vez). Fica pendente sempre que syncedAt
- * estiver vazio ou for anterior a updatedAt (ex.: depois de uma edição). */
+/* Cada apontamento guarda um "syncedAt" (quando foi enviado com sucesso ao
+ * backend pela última vez). Fica pendente sempre que syncedAt estiver vazio ou
+ * for anterior a updatedAt (ex.: depois de editar ou de encerrar).
+ *
+ * Entradas "em_andamento" também sincronizam (sem hora_fim ainda) — é assim que
+ * o Dashboard consegue enxergar, entre dispositivos, quando alguém esqueceu de
+ * encerrar uma atividade. Ao encerrar, o updatedAt muda de novo e o mesmo
+ * registro é reenviado (upsert por id), agora com a hora_fim preenchida. */
 
 function getUnsyncedEntries(employeeId) {
   return getEntriesByEmployee(employeeId).filter(
-    (e) => e.status === 'concluido' && (!e.syncedAt || new Date(e.updatedAt) > new Date(e.syncedAt))
+    (e) => !e.syncedAt || new Date(e.updatedAt) > new Date(e.syncedAt)
   );
 }
 

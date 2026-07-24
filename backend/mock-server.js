@@ -166,6 +166,17 @@ function saveProjeto(input) {
   return novo;
 }
 
+function listApontamentos(desde, ate) {
+  return db.apontamentos.filter((a) => (!desde || a.data >= desde) && (!ate || a.data <= ate));
+}
+
+function enviarReforcoApontamento(admin, colaboradorId, mensagem) {
+  const colaborador = db.colaboradores.find((c) => c.id === colaboradorId);
+  if (!colaborador) throw new Error('Colaborador não encontrado.');
+  console.log(`[mock] E-mail de reforço "enviado" para ${colaborador.email} (mensagem: ${mensagem || '(padrão)'})`);
+  return { enviado: true, para: colaborador.email };
+}
+
 function syncApontamentos(colaborador, entries, deletedIds) {
   entries = entries || [];
   deletedIds = deletedIds || [];
@@ -191,6 +202,7 @@ function syncApontamentos(colaborador, entries, deletedIds) {
       horaInicio: entry.startTime || '',
       horaFim: entry.endTime || '',
       duracaoMinutos: entry.durationMinutes != null ? entry.durationMinutes : '',
+      status: entry.status || (entry.endTime ? 'concluido' : 'em_andamento'),
       observacoes: entry.observations || '',
       criadoEm: entry.createdAt || '',
       atualizadoEm: entry.updatedAt || '',
@@ -282,6 +294,15 @@ const server = http.createServer((req, res) => {
           case 'syncApontamentos': {
             const session = requireAuth(email, senha);
             data = syncApontamentos(session, parsed.entries, parsed.deletedIds);
+            break;
+          }
+          case 'listApontamentos':
+            requireAdmin(email, senha);
+            data = listApontamentos(parsed.desde, parsed.ate);
+            break;
+          case 'enviarReforcoApontamento': {
+            const admin = requireAdmin(email, senha);
+            data = enviarReforcoApontamento(admin, parsed.colaboradorId, parsed.mensagem);
             break;
           }
           default:

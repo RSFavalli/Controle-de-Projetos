@@ -447,6 +447,7 @@
 
     setFormLockedForRunning(true);
     refreshAppUi();
+    syncEntries({ silent: true });
   }
 
   function onStopClick() {

@@ -19,6 +19,7 @@
     clientes: [],
     projetos: [],
     colaboradores: [],
+    apontamentos: [],
   };
 
   const els = {
@@ -75,6 +76,14 @@
     cancelColaboradorButton: document.getElementById('cancelColaboradorButton'),
     colaboradoresTableBody: document.getElementById('colaboradoresTableBody'),
     colaboradoresEmptyState: document.getElementById('colaboradoresEmptyState'),
+
+    // Apontamentos
+    apontamentosRangeSelect: document.getElementById('apontamentosRangeSelect'),
+    refreshApontamentosButton: document.getElementById('refreshApontamentosButton'),
+    conformidadeTableBody: document.getElementById('conformidadeTableBody'),
+    conformidadeEmptyState: document.getElementById('conformidadeEmptyState'),
+    horasChartContainer: document.getElementById('horasChartContainer'),
+    horasChartEmptyState: document.getElementById('horasChartEmptyState'),
   };
 
   /* --------------------------------- Init --------------------------------- */
@@ -122,6 +131,10 @@
     els.newColaboradorButton.addEventListener('click', () => openColaboradorForm());
     els.cancelColaboradorButton.addEventListener('click', () => closeForm(els.colaboradorForm));
     els.colaboradorForm.addEventListener('submit', onColaboradorSubmit);
+
+    // Apontamentos
+    els.refreshApontamentosButton.addEventListener('click', () => loadApontamentos());
+    els.apontamentosRangeSelect.addEventListener('change', () => loadApontamentos());
   }
 
   function showScreen(name) {
@@ -240,6 +253,9 @@
     document.querySelectorAll('.tab-panel').forEach((panel) => {
       panel.classList.toggle('hidden', panel.id !== `tab-${tabName}`);
     });
+    if (tabName === 'apontamentos') {
+      loadApontamentos();
+    }
   }
 
   /* -------------------------------- Clientes -------------------------------- */
@@ -473,6 +489,177 @@
         actionsTd.appendChild(rowActions);
         els.colaboradoresTableBody.appendChild(tr);
       });
+  }
+
+  /* ------------------------------- Apontamentos ------------------------------- */
+
+  async function loadApontamentos() {
+    const dias = Number(els.apontamentosRangeSelect.value);
+    const businessDays = Holidays.lastBusinessDays(dias);
+    const desde = businessDays[0];
+
+    try {
+      const apontamentos = await Api.listApontamentos(state.session, desde, undefined);
+      state.apontamentos = apontamentos;
+      renderConformidade(businessDays);
+      renderHorasChart(apontamentos);
+    } catch (err) {
+      if (isAuthError(err)) {
+        toast('Sessão expirada ou inválida. Faça login novamente.', 'error');
+        onLogout();
+      } else {
+        toast(`Erro ao carregar apontamentos: ${err.message}`, 'error');
+      }
+    }
+  }
+
+  function renderConformidade(businessDays) {
+    const hoje = Holidays.dateStr(new Date());
+    const ativos = state.colaboradores.filter((c) => c.ativo);
+
+    const linhas = ativos.map((colaborador) => {
+      const doColaborador = state.apontamentos.filter((a) => a.colaboradorId === colaborador.id);
+      const diasComApontamento = new Set(doColaborador.map((a) => a.data));
+      const diasSemApontamento = businessDays.filter((d) => !diasComApontamento.has(d)).length;
+      // Uma atividade em aberto de HOJE é normal (a pessoa está trabalhando
+      // nela agora) — só conta como pendência se sobrou aberta de outro dia.
+      const atividadesEmAberto = doColaborador.filter((a) => a.status === 'em_andamento' && a.data !== hoje).length;
+      return {
+        colaborador,
+        diasSemApontamento,
+        atividadesEmAberto,
+        score: diasSemApontamento + atividadesEmAberto,
+      };
+    });
+
+    linhas.sort((a, b) => b.score - a.score);
+
+    els.conformidadeTableBody.innerHTML = '';
+    els.conformidadeEmptyState.classList.toggle('hidden', linhas.length > 0);
+
+    linhas.forEach(({ colaborador, diasSemApontamento, atividadesEmAberto, score }) => {
+      const severidade = severityFor(score);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(colaborador.nome)}</td>
+        <td>${diasSemApontamento} de ${businessDays.length}</td>
+        <td>${atividadesEmAberto}</td>
+        <td><span class="status-pill ${severidade.cls}">${severidade.icon} ${severidade.label}</span></td>
+        <td></td>
+      `;
+      if (score > 0) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = 'Notificar';
+        btn.addEventListener('click', () => onNotificar(colaborador));
+        const rowActions = document.createElement('div');
+        rowActions.className = 'row-actions';
+        rowActions.appendChild(btn);
+        tr.querySelector('td:last-child').appendChild(rowActions);
+      }
+      els.conformidadeTableBody.appendChild(tr);
+    });
+  }
+
+  function severityFor(score) {
+    if (score === 0) return { label: 'Em dia', cls: 'status-pill--good', icon: '●' };
+    if (score <= 2) return { label: 'Atenção', cls: 'status-pill--warning', icon: '▲' };
+    return { label: 'Crítico', cls: 'status-pill--critical', icon: '■' };
+  }
+
+  async function onNotificar(colaborador) {
+    const mensagem = window.prompt(
+      `Enviar e-mail de reforço para ${colaborador.nome}.\n\nMensagem adicional (opcional — pode deixar em branco e enviar só o texto padrão):`,
+      ''
+    );
+    if (mensagem === null) return; // cancelou o prompt
+    try {
+      await Api.enviarReforcoApontamento(state.session, colaborador.id, mensagem || undefined);
+      toast(`E-mail de reforço enviado para ${colaborador.nome}.`, 'success');
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  }
+
+  function renderHorasChart(apontamentos) {
+    const concluidos = apontamentos.filter((a) => a.duracaoMinutos != null && a.duracaoMinutos > 0);
+    els.horasChartEmptyState.classList.toggle('hidden', concluidos.length > 0);
+    els.horasChartContainer.innerHTML = '';
+    if (concluidos.length === 0) return;
+
+    const activities = window.APP_DATA.ACTIVITIES;
+    const colorFor = (index) => `var(--activity-${index + 1})`;
+
+    const porColaborador = {};
+    concluidos.forEach((a) => {
+      if (!porColaborador[a.colaboradorId]) {
+        porColaborador[a.colaboradorId] = { nome: a.colaboradorNome, porAtividade: {}, total: 0 };
+      }
+      const bucket = porColaborador[a.colaboradorId];
+      bucket.porAtividade[a.atividadeId] = (bucket.porAtividade[a.atividadeId] || 0) + a.duracaoMinutos;
+      bucket.total += a.duracaoMinutos;
+    });
+
+    const linhas = Object.values(porColaborador).sort((a, b) => b.total - a.total);
+    const maiorTotal = Math.max(...linhas.map((l) => l.total));
+
+    const legend = document.createElement('div');
+    legend.className = 'horas-chart__legend';
+    activities.forEach((act, i) => {
+      const item = document.createElement('span');
+      item.className = 'horas-chart__legend-item';
+      item.innerHTML = `<i style="background:${colorFor(i)}"></i>${escapeHtml(act.name)}`;
+      legend.appendChild(item);
+    });
+
+    const rows = document.createElement('div');
+    rows.className = 'horas-chart__rows';
+
+    linhas.forEach((linha) => {
+      const row = document.createElement('div');
+      row.className = 'horas-chart__row';
+
+      const label = document.createElement('div');
+      label.className = 'horas-chart__label';
+      label.innerHTML = `<span class="horas-chart__name">${escapeHtml(linha.nome)}</span><span class="horas-chart__total">${formatHm(linha.total)}</span>`;
+
+      const track = document.createElement('div');
+      track.className = 'horas-chart__track';
+      // A largura da track (relativa ao maior total) mostra quem trabalhou
+      // mais horas no período; os segmentos dentro dela mostram a composição
+      // por atividade daquele colaborador.
+      track.style.width = `${Math.max(6, (linha.total / maiorTotal) * 100)}%`;
+
+      activities.forEach((act, i) => {
+        const minutos = linha.porAtividade[act.id];
+        if (!minutos) return;
+        const segment = document.createElement('div');
+        segment.className = 'horas-chart__segment';
+        segment.style.background = colorFor(i);
+        segment.style.flexBasis = `${(minutos / linha.total) * 100}%`;
+        segment.title = `${linha.nome} — ${act.name}: ${formatHm(minutos)}`;
+        if (minutos / linha.total > 0.12) {
+          const segLabel = document.createElement('span');
+          segLabel.className = 'horas-chart__segment-label';
+          segLabel.textContent = formatHm(minutos);
+          segment.appendChild(segLabel);
+        }
+        track.appendChild(segment);
+      });
+
+      row.appendChild(label);
+      row.appendChild(track);
+      rows.appendChild(row);
+    });
+
+    els.horasChartContainer.appendChild(legend);
+    els.horasChartContainer.appendChild(rows);
+  }
+
+  function formatHm(totalMinutes) {
+    const h = Math.floor(totalMinutes / 60);
+    const m = Math.round(totalMinutes % 60);
+    return `${h}h${String(m).padStart(2, '0')}`;
   }
 
   /* ------------------------------- Utilitários ------------------------------- */

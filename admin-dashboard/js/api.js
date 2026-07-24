@@ -82,6 +82,10 @@ const Api = (() => {
 
     listColaboradores: (session) => call('listColaboradores', session),
     saveColaborador: (session, colaborador) => call('saveColaborador', { ...session, colaborador }),
+
+    listApontamentos: (session, desde, ate) => call('listApontamentos', { ...session, desde, ate }),
+    enviarReforcoApontamento: (session, colaboradorId, mensagem) =>
+      call('enviarReforcoApontamento', { ...session, colaboradorId, mensagem }),
   };
 })();
 

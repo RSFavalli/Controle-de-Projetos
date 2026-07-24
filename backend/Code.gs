@@ -12,11 +12,17 @@
  *   Projetos:      id | cliente_id | nome | ativo | criado_em
  *   Apontamentos:  id | colaborador_id | colaborador_nome | cliente_id | cliente_nome |
  *                  projeto_id | projeto_nome | atividade_id | atividade_nome | data |
- *                  hora_inicio | hora_fim | duracao_minutos | observacoes | criado_em |
- *                  atualizado_em | sincronizado_em
+ *                  hora_inicio | hora_fim | duracao_minutos | status | observacoes |
+ *                  criado_em | atualizado_em | sincronizado_em
  *
  * "papel" em Colaboradores é "admin" ou "colaborador". Apenas quem tem
  * papel = admin consegue usar o Dashboard Admin.
+ *
+ * Este script também manda e-mail (via MailApp, usando a conta que publicou o
+ * Web App): um lembrete diário automático (função enviarAlertasDiarios, ligada
+ * por um gatilho — rode configurarAlertaDiario() uma vez pelo editor para
+ * ativar) e um reforço manual disparado pelo Dashboard. Respostas dos
+ * colaboradores caem em ADMIN_EMAIL, não na caixa de quem publicou o script.
  *
  * COMO PUBLICAR: veja o arquivo SETUP.md que acompanha este script.
  * ------------------------------------------------------------------
@@ -27,6 +33,9 @@ const SHEET_CLIENTES = 'Clientes';
 const SHEET_PROJETOS = 'Projetos';
 const SHEET_APONTAMENTOS = 'Apontamentos';
 
+const ADMIN_EMAIL = 'rafael.favalli@agricef.com.br';
+const APP_URL = 'https://rsfavalli.github.io/Controle-de-Projetos/';
+
 const HEADERS = {
   [SHEET_COLABORADORES]: ['id', 'nome', 'email', 'senha_hash', 'papel', 'ativo', 'criado_em'],
   [SHEET_CLIENTES]: ['id', 'nome', 'ativo', 'criado_em'],
@@ -34,7 +43,7 @@ const HEADERS = {
   [SHEET_APONTAMENTOS]: [
     'id', 'colaborador_id', 'colaborador_nome', 'cliente_id', 'cliente_nome',
     'projeto_id', 'projeto_nome', 'atividade_id', 'atividade_nome', 'data',
-    'hora_inicio', 'hora_fim', 'duracao_minutos', 'observacoes',
+    'hora_inicio', 'hora_fim', 'duracao_minutos', 'status', 'observacoes',
     'criado_em', 'atualizado_em', 'sincronizado_em',
   ],
 };
@@ -108,6 +117,17 @@ function doPost(e) {
       case 'syncApontamentos': {
         const session = requireAuth(body.email, body.senha);
         data = syncApontamentos(session, body.entries, body.deletedIds);
+        break;
+      }
+
+      case 'listApontamentos':
+        requireAdmin(body.email, body.senha);
+        data = listApontamentos(body.desde, body.ate);
+        break;
+
+      case 'enviarReforcoApontamento': {
+        const admin = requireAdmin(body.email, body.senha);
+        data = enviarReforcoApontamento(admin, body.colaboradorId, body.mensagem);
         break;
       }
 
@@ -399,6 +419,7 @@ function syncApontamentos(colaborador, entries, deletedIds) {
   entries = entries || [];
   deletedIds = deletedIds || [];
 
+  ensureHeaders(SHEET_APONTAMENTOS);
   const sheet = getSheet(SHEET_APONTAMENTOS);
   const rows = sheetToObjects(SHEET_APONTAMENTOS);
   const rowIndexById = {};
@@ -428,6 +449,7 @@ function syncApontamentos(colaborador, entries, deletedIds) {
       hora_inicio: entry.startTime || '',
       hora_fim: entry.endTime || '',
       duracao_minutos: entry.durationMinutes != null ? entry.durationMinutes : '',
+      status: entry.status || (entry.endTime ? 'concluido' : 'em_andamento'),
       observacoes: entry.observations || '',
       criado_em: entry.createdAt || '',
       atualizado_em: entry.updatedAt || '',
@@ -465,6 +487,239 @@ function syncApontamentos(colaborador, entries, deletedIds) {
   return { synced: syncedCount, deleted: deletedCount };
 }
 
+/**
+ * Lista apontamentos para o Dashboard (uso de admin): gráfico de horas por
+ * colaborador/atividade e o painel de conformidade. "desde"/"ate" são datas
+ * 'YYYY-MM-DD' opcionais para limitar o período (comparação lexicográfica,
+ * funciona porque o formato ISO já ordena cronologicamente).
+ */
+function listApontamentos(desde, ate) {
+  ensureHeaders(SHEET_APONTAMENTOS);
+  return sheetToObjects(SHEET_APONTAMENTOS)
+    .map((r) => ({
+      id: r.id,
+      colaboradorId: r.colaborador_id,
+      colaboradorNome: r.colaborador_nome,
+      clienteId: r.cliente_id,
+      clienteNome: r.cliente_nome,
+      projetoId: r.projeto_id,
+      projetoNome: r.projeto_nome,
+      atividadeId: r.atividade_id,
+      atividadeNome: r.atividade_nome,
+      data: asDateStr(r.data),
+      horaInicio: asTimeStr(r.hora_inicio),
+      horaFim: asTimeStr(r.hora_fim),
+      duracaoMinutos: r.duracao_minutos === '' || r.duracao_minutos == null ? null : Number(r.duracao_minutos),
+      status: r.status || (r.hora_fim ? 'concluido' : 'em_andamento'),
+      observacoes: r.observacoes,
+      atualizadoEm: r.atualizado_em,
+    }))
+    .filter((r) => (!desde || r.data >= desde) && (!ate || r.data <= ate));
+}
+
+/* ========================================================================
+ * Feriados — para saber quais dias têm apontamento obrigatório.
+ * Sábados/domingos nunca são obrigatórios; feriados nacionais e municipais
+ * de Paulínia/SP (onde a equipe está baseada) também não.
+ * ==================================================================== */
+
+// Data da Páscoa pelo algoritmo de Gauss/Meeus — feriados móveis (Carnaval,
+// Sexta-feira Santa, Corpus Christi, Sagrado Coração de Jesus) partem dela.
+function easterDate(year) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+}
+
+function addDays(date, days) {
+  const d = new Date(date.getTime());
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+// Fixos + móveis. Carnaval e Corpus Christi são "ponto facultativo" a rigor,
+// mas tratados aqui como não-úteis por serem universalmente observados nas
+// empresas brasileiras.
+function feriadosNacionais(year) {
+  const pascoa = easterDate(year);
+  return [
+    new Date(year, 0, 1), // Confraternização Universal
+    addDays(pascoa, -48), // Carnaval (segunda)
+    addDays(pascoa, -47), // Carnaval (terça)
+    addDays(pascoa, -2), // Sexta-feira Santa
+    addDays(pascoa, 60), // Corpus Christi
+    new Date(year, 3, 21), // Tiradentes
+    new Date(year, 4, 1), // Dia do Trabalho
+    new Date(year, 8, 7), // Independência do Brasil
+    new Date(year, 9, 12), // Nossa Senhora Aparecida
+    new Date(year, 10, 2), // Finados
+    new Date(year, 10, 15), // Proclamação da República
+    new Date(year, 10, 20), // Consciência Negra (feriado nacional desde a Lei 14.759/2023)
+    new Date(year, 11, 25), // Natal
+  ];
+}
+
+// Feriados municipais de Paulínia/SP: aniversário da cidade (28/fev, fixo) e o
+// padroeiro Sagrado Coração de Jesus (móvel, Páscoa + 68 dias). Conferido contra
+// o calendário oficial 2026 da Prefeitura (paulinia.sp.gov.br/feriados2026).
+// Pontos facultativos extras decretados ao longo do ano não entram aqui — não
+// dá pra prever; adicione manualmente em EXTRA_DIAS_NAO_UTEIS se precisar.
+function feriadosPaulinia(year) {
+  const pascoa = easterDate(year);
+  return [
+    new Date(year, 1, 28), // Aniversário de Paulínia
+    addDays(pascoa, 68), // Sagrado Coração de Jesus (padroeiro)
+  ];
+}
+
+const EXTRA_DIAS_NAO_UTEIS = []; // formato 'YYYY-MM-DD', para exceções pontuais
+
+function isBusinessDay(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  const dow = date.getDay(); // 0 = domingo, 6 = sábado
+  if (dow === 0 || dow === 6) return false;
+  if (EXTRA_DIAS_NAO_UTEIS.indexOf(dateStr) !== -1) return false;
+  const feriados = feriadosNacionais(y).concat(feriadosPaulinia(y)).map(formatDateStr);
+  return feriados.indexOf(dateStr) === -1;
+}
+
+function formatDateStr(date) {
+  return Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+}
+
+/* ========================================================================
+ * Alertas de apontamento por e-mail
+ * ==================================================================== */
+
+/**
+ * Para uma data específica, quais colaboradores ativos não apontaram nada, ou
+ * deixaram alguma atividade sem encerrar (sem hora_fim). Um colaborador pode
+ * aparecer por um motivo, outro, ou os dois.
+ */
+function pendenciasDoDia(dateStr) {
+  ensureHeaders(SHEET_APONTAMENTOS);
+  const colaboradores = sheetToObjects(SHEET_COLABORADORES).filter((c) => normalizeBool(c.ativo));
+  const apontamentosDoDia = sheetToObjects(SHEET_APONTAMENTOS).filter((a) => asDateStr(a.data) === dateStr);
+
+  return colaboradores
+    .map((c) => {
+      const doColaborador = apontamentosDoDia.filter((a) => a.colaborador_id === c.id);
+      return {
+        id: c.id,
+        nome: c.nome,
+        email: c.email,
+        semApontamento: doColaborador.length === 0,
+        naoFechou: doColaborador.some((a) => !asTimeStr(a.hora_fim)),
+      };
+    })
+    .filter((c) => c.semApontamento || c.naoFechou);
+}
+
+/**
+ * Roda uma vez por dia (gatilho criado por configurarAlertaDiario). Se hoje for
+ * dia útil, manda um lembrete automático para quem não apontou ou não fechou
+ * alguma atividade hoje. Resposta do colaborador cai em ADMIN_EMAIL.
+ */
+function enviarAlertasDiarios() {
+  const hojeStr = formatDateStr(new Date());
+  if (!isBusinessDay(hojeStr)) {
+    Logger.log('Hoje (%s) não é dia útil de apontamento — nenhum alerta enviado.', hojeStr);
+    return;
+  }
+
+  const pendencias = pendenciasDoDia(hojeStr);
+  pendencias.forEach((p) => {
+    const motivo = p.semApontamento
+      ? 'não vimos nenhum apontamento seu hoje'
+      : 'você deixou uma atividade em aberto hoje (sem horário de término)';
+    const corpo = [
+      `Olá, ${p.nome}!`,
+      '',
+      `Notamos que ${motivo}.`,
+      '',
+      'Se puder, regularize pelo app de campo:',
+      APP_URL,
+      '',
+      'Se não deu para apontar por algum motivo (folga, ausência, imprevisto etc.), é só responder este e-mail contando o motivo.',
+      '',
+      'Obrigado!',
+    ].join('\n');
+
+    MailApp.sendEmail({
+      to: p.email,
+      replyTo: ADMIN_EMAIL,
+      subject: 'Timesheet — lembrete de apontamento de hoje',
+      body: corpo,
+      name: 'Timesheet Agricef',
+    });
+  });
+
+  Logger.log('Alertas diários enviados para %s colaborador(es) em %s.', pendencias.length, hojeStr);
+}
+
+/**
+ * Rode esta função UMA VEZ pelo editor do Apps Script (menu de funções →
+ * configurarAlertaDiario → Executar) para ligar o lembrete automático diário.
+ * É seguro rodar de novo (remove o gatilho antigo antes de criar um novo, não
+ * duplica). O horário (19h) é só o disparo do gatilho — pode ajustar abaixo.
+ */
+function configurarAlertaDiario() {
+  ScriptApp.getProjectTriggers().forEach((t) => {
+    if (t.getHandlerFunction() === 'enviarAlertasDiarios') {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+  ScriptApp.newTrigger('enviarAlertasDiarios').timeBased().everyDays(1).atHour(19).create();
+  Logger.log('Gatilho diário configurado: enviarAlertasDiarios roda todo dia por volta das 19h (fuso do script).');
+}
+
+/**
+ * Reforço manual disparado pelo Dashboard (botão "Notificar") para um
+ * colaborador específico — usado quando o admin avalia, pelo painel de
+ * conformidade, que o caso já merece uma cobrança direta.
+ */
+function enviarReforcoApontamento(admin, colaboradorId, mensagemPersonalizada) {
+  if (!colaboradorId) throw new Error('Informe o colaborador.');
+  const colaborador = sheetToObjects(SHEET_COLABORADORES).find((c) => c.id === colaboradorId);
+  if (!colaborador) throw new Error('Colaborador não encontrado.');
+
+  const corpoBase = [
+    `Olá, ${colaborador.nome}!`,
+    '',
+    `${admin.nome} percebeu que seus apontamentos de horas estão atrasados com frequência.`,
+    '',
+    'Por favor, mantenha o apontamento em dia pelo app de campo:',
+    APP_URL,
+    '',
+    'Se estiver enfrentando alguma dificuldade para apontar, responda este e-mail contando o que está acontecendo.',
+  ].join('\n');
+
+  const corpo = mensagemPersonalizada ? `${mensagemPersonalizada}\n\n---\n\n${corpoBase}` : corpoBase;
+
+  MailApp.sendEmail({
+    to: colaborador.email,
+    replyTo: ADMIN_EMAIL,
+    subject: 'Timesheet — reforço sobre apontamento de horas',
+    body: corpo,
+    name: 'Timesheet Agricef',
+  });
+
+  return { enviado: true, para: colaborador.email };
+}
+
 /* ========================================================================
  * Helpers de planilha
  * ==================================================================== */
@@ -475,6 +730,45 @@ function getSheet(name) {
     throw new Error(`Aba "${name}" não encontrada. Rode seedDatabase() primeiro (veja SETUP.md).`);
   }
   return sheet;
+}
+
+/**
+ * Garante que a aba tem todas as colunas de HEADERS (acrescenta as que
+ * faltarem, sem mexer nas existentes) — usado pela aba Apontamentos, que
+ * ganhou a coluna "status" depois de já publicada em produção. Também força
+ * formato de texto puro nas colunas de data/hora: sem isso, o Google Sheets
+ * "adivinha" que "2026-07-17"/"09:30" são datas de verdade e troca o tipo da
+ * célula sozinho, quebrando as comparações de string usadas nos alertas.
+ */
+function ensureHeaders(sheetName) {
+  const sheet = getSheet(sheetName);
+  const lastCol = sheet.getLastColumn();
+  const currentHeaders = lastCol > 0 ? sheet.getRange(1, 1, 1, lastCol).getValues()[0] : [];
+  const expected = HEADERS[sheetName];
+  const missing = expected.filter((h) => currentHeaders.indexOf(h) === -1);
+  if (missing.length > 0) {
+    sheet.getRange(1, currentHeaders.length + 1, 1, missing.length).setValues([missing]);
+  }
+
+  if (sheetName === SHEET_APONTAMENTOS) {
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    ['data', 'hora_inicio', 'hora_fim'].forEach((colName) => {
+      const colIndex = headers.indexOf(colName);
+      if (colIndex !== -1) {
+        sheet.getRange(1, colIndex + 1, Math.max(sheet.getMaxRows(), 2)).setNumberFormat('@');
+      }
+    });
+  }
+}
+
+// Datas/horas às vezes voltam como objeto Date (quando o Sheets converteu a
+// célula sozinho antes do formato de texto puro ser aplicado) — normaliza de
+// volta para string, senão as comparações de data quebram silenciosamente.
+function asDateStr(v) {
+  return v instanceof Date ? formatDateStr(v) : v;
+}
+function asTimeStr(v) {
+  return v instanceof Date ? Utilities.formatDate(v, Session.getScriptTimeZone(), 'HH:mm') : v;
 }
 
 function sheetToObjects(name) {

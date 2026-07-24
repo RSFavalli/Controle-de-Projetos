@@ -68,6 +68,7 @@
         <button class="tab-button is-active" data-tab="clientes" role="tab">Clientes</button>
         <button class="tab-button" data-tab="projetos" role="tab">Projetos</button>
         <button class="tab-button" data-tab="colaboradores" role="tab">Colaboradores</button>
+        <button class="tab-button" data-tab="apontamentos" role="tab">Apontamentos</button>
       </nav>
 
       <!-- ---------------- Clientes ---------------- -->
@@ -188,6 +189,49 @@
         </div>
       </section>
 
+      <!-- ---------------- Apontamentos ---------------- -->
+      <section id="tab-apontamentos" class="tab-panel card hidden">
+        <div class="panel-header">
+          <h2>Apontamentos</h2>
+          <div class="panel-header__controls">
+            <label for="apontamentosRangeSelect" class="visually-hidden">Período</label>
+            <select id="apontamentosRangeSelect">
+              <option value="15">Últimos 15 dias úteis</option>
+              <option value="30">Últimos 30 dias úteis</option>
+              <option value="60">Últimos 60 dias úteis</option>
+            </select>
+            <button class="btn btn--ghost btn--small" id="refreshApontamentosButton">Atualizar</button>
+          </div>
+        </div>
+
+        <p class="muted">
+          Verificação automática: quem não apontou ou deixou uma atividade em aberto num dia útil recebe um lembrete
+          por e-mail sozinho, todo fim de dia. Fins de semana e feriados (nacionais e de Paulínia/SP) não contam.
+          Este painel mostra a frequência de pendências para você avaliar quando vale um reforço manual.
+        </p>
+
+        <h3 class="section-subheading">Conformidade de apontamento</h3>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Colaborador</th>
+                <th>Dias sem apontar</th>
+                <th>Atividades em aberto</th>
+                <th>Situação</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="conformidadeTableBody"></tbody>
+          </table>
+          <p id="conformidadeEmptyState" class="empty-state hidden">Nenhum colaborador ativo cadastrado ainda.</p>
+        </div>
+
+        <h3 class="section-subheading">Distribuição de horas por atividade</h3>
+        <p id="horasChartEmptyState" class="empty-state hidden">Nenhum apontamento concluído no período selecionado.</p>
+        <div id="horasChartContainer" class="horas-chart-container"></div>
+      </section>
+
     </section>
 
   </main>
@@ -196,6 +240,8 @@
     <p>Dados armazenados em uma planilha do Google Sheets, acessada via Google Apps Script. Veja <code>backend/SETUP.md</code> para detalhes.</p>
   </footer>
 
+  <script src="js/data.js"></script>
+  <script src="js/holidays.js"></script>
   <script src="js/api.js"></script>
   <script src="js/app.js"></script>
 </body>
