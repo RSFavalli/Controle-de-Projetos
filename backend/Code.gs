@@ -24,6 +24,9 @@
  * ativar) e um reforço manual disparado pelo Dashboard. Respostas dos
  * colaboradores caem em ADMIN_EMAIL, não na caixa de quem publicou o script.
  *
+ * O resumo de projetos por IA (gerarResumoIA) chama a API do Gemini — precisa
+ * da propriedade de script GEMINI_API_KEY configurada (veja SETUP.md).
+ *
  * COMO PUBLICAR: veja o arquivo SETUP.md que acompanha este script.
  * ------------------------------------------------------------------
  */
@@ -35,6 +38,12 @@ const SHEET_APONTAMENTOS = 'Apontamentos';
 
 const ADMIN_EMAIL = 'rafael.favalli@agricef.com.br';
 const APP_URL = 'https://rsfavalli.github.io/Controle-de-Projetos/';
+
+// Modelo do Gemini usado no resumo de projetos por IA (veja gerarResumoIA).
+// Se um dia parar de funcionar (modelo descontinuado), troque aqui — veja os
+// nomes disponíveis em https://aistudio.google.com/app/prompts (ou na doc da
+// API). A chave em si NÃO fica aqui: veja getGeminiApiKey().
+const GEMINI_MODEL = 'gemini-2.0-flash';
 
 const HEADERS = {
   [SHEET_COLABORADORES]: ['id', 'nome', 'email', 'senha_hash', 'papel', 'cargo', 'ativo', 'criado_em'],
@@ -130,6 +139,11 @@ function doPost(e) {
         data = enviarReforcoApontamento(admin, body.colaboradorId, body.mensagem);
         break;
       }
+
+      case 'gerarResumoIA':
+        requireAdmin(body.email, body.senha);
+        data = gerarResumoIA();
+        break;
 
       default:
         throw new Error('Ação desconhecida: ' + action);
@@ -723,6 +737,156 @@ function enviarReforcoApontamento(admin, colaboradorId, mensagemPersonalizada) {
   });
 
   return { enviado: true, para: colaborador.email };
+}
+
+/* ========================================================================
+ * Resumo de projetos por IA (Gemini)
+ * ==================================================================== */
+
+function getGeminiApiKey() {
+  const key = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+  if (!key) {
+    throw new Error(
+      'GEMINI_API_KEY não configurada. Veja backend/SETUP.md — crie a chave em aistudio.google.com/app/apikey e ' +
+        'salve em Configurações do projeto → Propriedades do script.'
+    );
+  }
+  return key;
+}
+
+/**
+ * Agrega todos os apontamentos concluídos por projeto (total, por atividade e
+ * por colaborador/cargo) e pede pro Gemini escrever um resumo executivo em
+ * português. Os NÚMEROS são sempre calculados aqui (nunca pelo modelo) — a IA
+ * só narra o que já foi somado, pra não arriscar inventar total errado.
+ */
+function gerarResumoIA() {
+  const apontamentos = sheetToObjects(SHEET_APONTAMENTOS).filter(
+    (a) => a.duracao_minutos !== '' && a.duracao_minutos != null && Number(a.duracao_minutos) > 0
+  );
+  if (apontamentos.length === 0) {
+    throw new Error('Ainda não há apontamentos concluídos suficientes para gerar um resumo.');
+  }
+
+  const colaboradorPorId = {};
+  sheetToObjects(SHEET_COLABORADORES).forEach((c) => {
+    colaboradorPorId[c.id] = { nome: c.nome, cargo: c.cargo || '(sem cargo cadastrado)' };
+  });
+
+  const porProjeto = {};
+  apontamentos.forEach((a) => {
+    const key = a.projeto_id;
+    if (!porProjeto[key]) {
+      porProjeto[key] = {
+        projeto: a.projeto_nome,
+        cliente: a.cliente_nome,
+        totalMinutos: 0,
+        porAtividade: {},
+        porColaborador: {},
+        porCargo: {},
+      };
+    }
+    const p = porProjeto[key];
+    const minutos = Number(a.duracao_minutos);
+    p.totalMinutos += minutos;
+    p.porAtividade[a.atividade_nome] = (p.porAtividade[a.atividade_nome] || 0) + minutos;
+
+    const colaborador = colaboradorPorId[a.colaborador_id] || { nome: a.colaborador_nome, cargo: '(sem cargo cadastrado)' };
+    p.porColaborador[colaborador.nome] = (p.porColaborador[colaborador.nome] || 0) + minutos;
+    p.porCargo[colaborador.cargo] = (p.porCargo[colaborador.cargo] || 0) + minutos;
+  });
+
+  const resumoNumerico = Object.values(porProjeto)
+    .sort((a, b) => b.totalMinutos - a.totalMinutos)
+    .map((p) => {
+      const topAtividade = maiorChave(p.porAtividade);
+      const topColaborador = maiorChave(p.porColaborador);
+      const topCargo = maiorChave(p.porCargo);
+      return {
+        projeto: p.projeto,
+        cliente: p.cliente,
+        totalHoras: minutosParaHoras(p.totalMinutos),
+        atividadePrincipal: topAtividade ? `${topAtividade} (${minutosParaHoras(p.porAtividade[topAtividade])}h)` : '—',
+        colaboradorPrincipal: topColaborador ? `${topColaborador} (${minutosParaHoras(p.porColaborador[topColaborador])}h)` : '—',
+        cargoPrincipal: topCargo ? `${topCargo} (${minutosParaHoras(p.porCargo[topCargo])}h)` : '—',
+      };
+    });
+
+  const prompt = [
+    'Você é um assistente que escreve resumos executivos curtos, em português do Brasil, para um gestor de consultoria',
+    'agrícola acompanhar como as horas da equipe estão sendo investidas em cada projeto.',
+    '',
+    'Abaixo está uma lista JSON já calculada com, para cada projeto: total de horas, a atividade que mais consumiu horas,',
+    'o colaborador que mais trabalhou nele, e o cargo que mais trabalhou nele. NÃO recalcule nem invente números — use',
+    'exatamente os valores fornecidos.',
+    '',
+    JSON.stringify(resumoNumerico, null, 2),
+    '',
+    'Escreva um resumo em texto corrido (pode usar um parágrafo curto por projeto, ou tópicos — o que ficar mais legível),',
+    'destacando: onde as horas estão concentradas, qual atividade domina em cada projeto, e quem (colaborador/cargo) é o',
+    'principal recurso alocado. Se notar algo que pareça um desequilíbrio (ex.: um projeto muito dependente de uma única',
+    'pessoa), pode comentar. Seja direto e objetivo — isto é para leitura rápida por um gestor, não um relatório longo.',
+  ].join('\n');
+
+  const texto = chamarGemini(prompt);
+  return { resumo: texto, projetos: resumoNumerico.length };
+}
+
+function maiorChave(mapa) {
+  let melhor = null;
+  let melhorValor = -1;
+  Object.keys(mapa).forEach((k) => {
+    if (mapa[k] > melhorValor) {
+      melhor = k;
+      melhorValor = mapa[k];
+    }
+  });
+  return melhor;
+}
+
+function minutosParaHoras(minutos) {
+  return Math.round((minutos / 60) * 10) / 10;
+}
+
+function chamarGemini(prompt) {
+  const apiKey = getGeminiApiKey();
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
+  const payload = {
+    contents: [{ parts: [{ text: prompt }] }],
+  };
+
+  const response = UrlFetchApp.fetch(url, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true,
+  });
+
+  const status = response.getResponseCode();
+  let json;
+  try {
+    json = JSON.parse(response.getContentText());
+  } catch (err) {
+    throw new Error('Resposta inesperada da API do Gemini (não é JSON).');
+  }
+
+  if (status !== 200) {
+    const msg = json && json.error && json.error.message ? json.error.message : `Erro HTTP ${status}`;
+    throw new Error('Falha ao chamar o Gemini: ' + msg);
+  }
+
+  const texto =
+    json.candidates &&
+    json.candidates[0] &&
+    json.candidates[0].content &&
+    json.candidates[0].content.parts &&
+    json.candidates[0].content.parts[0] &&
+    json.candidates[0].content.parts[0].text;
+
+  if (!texto) {
+    throw new Error('O Gemini não retornou texto (resposta pode ter sido bloqueada por segurança).');
+  }
+  return texto.trim();
 }
 
 /* ========================================================================

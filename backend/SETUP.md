@@ -2,7 +2,7 @@
 
 Passo a passo para colocar a API no ar. Leva uns 10 minutos, tudo feito na sua conta Google — eu não tenho acesso a essa conta, então esses passos precisam ser feitos por você.
 
-> **Já configurou antes e está atualizando o `Code.gs`?** A versão atual libera a leitura de Clientes/Projetos (`listClientes`/`listProjetos`) para qualquer colaborador autenticado, não só admin — é o que o app de campo usa para carregar essas listas. Também adiciona a aba **Apontamentos** (usada pela sincronização dos registros de horas do app de campo), um **limite de tentativas de login** (bloqueia por 15 min um e-mail depois de 5 senhas erradas seguidas), os **alertas de apontamento por e-mail** (lembrete diário automático + reforço manual pelo Dashboard — veja o passo 9) e um campo **Cargo** na aba Colaboradores (opcional, usado para agrupar horas por função no Dashboard). Cole o `Code.gs` novo por cima do antigo (passo 2), **rode `seedDatabase` de novo** (passo 4 — é seguro rodar mais de uma vez, só cria o que ainda não existe) para criar a aba Apontamentos, **rode `configurarAlertaDiario` uma vez** (passo 9) para ligar o lembrete automático, e **implante uma nova versão** (passo 6 tem o caminho: Implantar → Gerenciar implantações → ícone de lápis → Nova versão → Implantar). A coluna Cargo é criada sozinha na primeira chamada que usar a aba Colaboradores, não precisa de passo manual. A URL do Web App continua a mesma.
+> **Já configurou antes e está atualizando o `Code.gs`?** A versão atual libera a leitura de Clientes/Projetos (`listClientes`/`listProjetos`) para qualquer colaborador autenticado, não só admin — é o que o app de campo usa para carregar essas listas. Também adiciona a aba **Apontamentos** (usada pela sincronização dos registros de horas do app de campo), um **limite de tentativas de login** (bloqueia por 15 min um e-mail depois de 5 senhas erradas seguidas), os **alertas de apontamento por e-mail** (lembrete diário automático + reforço manual pelo Dashboard — veja o passo 9), um campo **Cargo** na aba Colaboradores (opcional) e o **resumo de projetos por IA** via Gemini (veja o passo 10). Cole o `Code.gs` novo por cima do antigo (passo 2), **rode `seedDatabase` de novo** (passo 4 — é seguro rodar mais de uma vez, só cria o que ainda não existe) para criar a aba Apontamentos, **rode `configurarAlertaDiario` uma vez** (passo 9) para ligar o lembrete automático, **configure `GEMINI_API_KEY`** (passo 10) se quiser usar o resumo por IA, e **implante uma nova versão** (passo 6 tem o caminho: Implantar → Gerenciar implantações → ícone de lápis → Nova versão → Implantar). A coluna Cargo é criada sozinha na primeira chamada que usar a aba Colaboradores, não precisa de passo manual. A URL do Web App continua a mesma.
 
 ## 1. Criar a planilha
 
@@ -89,6 +89,21 @@ Para ligar o lembrete automático (só precisa fazer isso **uma vez**):
 4. Pronto — o gatilho fica ativo mesmo com o editor fechado. Para conferir, vá no ícone de relógio (**Gatilhos**) na barra lateral esquerda do editor: deve aparecer `enviarAlertasDiarios` rodando todo dia.
 
 É seguro rodar `configurarAlertaDiario` de novo no futuro (ex.: se quiser mudar o horário no código) — ele substitui o gatilho antigo, não duplica.
+
+## 10. Ativar o resumo de projetos por IA (opcional)
+
+O Dashboard tem um botão "Gerar resumo" (aba Apontamentos) que pede pro Gemini escrever um resumo executivo de como as horas estão distribuídas entre os projetos — qual atividade domina em cada um, quem é o principal recurso alocado, etc. Os números são sempre calculados pelo próprio `Code.gs` (a IA só escreve o texto em cima do que já foi somado, nunca recalcula).
+
+Isso é opcional — sem a chave configurada, o resto do sistema funciona normal, só esse botão específico não funciona.
+
+1. Crie uma chave em **[aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)** (Create API key).
+2. No editor do Apps Script → **Configurações do projeto** → **Propriedades do script** → **Adicionar propriedade do script**.
+3. Nome: `GEMINI_API_KEY` — Valor: cole a chave.
+4. Salve e implante uma nova versão (passo 6).
+
+Na primeira vez que o botão "Gerar resumo" for usado, o Google pode pedir uma autorização extra para o script **fazer chamadas a serviços externos** — é a mesma tela de sempre (Revisar permissões → Avançado → Permitir).
+
+Sobre custo: o Gemini tem camada gratuita; para o volume de uso daqui (um resumo curto por clique), é bem provável que fique dentro do limite grátis. Se o modelo `gemini-2.0-flash` (constante `GEMINI_MODEL` no topo do `Code.gs`) for descontinuado no futuro, troque o nome ali por um modelo atual — veja a lista em [aistudio.google.com](https://aistudio.google.com).
 
 ## Sempre que você editar o Code.gs
 

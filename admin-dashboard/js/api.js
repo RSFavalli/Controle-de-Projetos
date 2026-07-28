@@ -86,6 +86,8 @@ const Api = (() => {
     listApontamentos: (session, desde, ate) => call('listApontamentos', { ...session, desde, ate }),
     enviarReforcoApontamento: (session, colaboradorId, mensagem) =>
       call('enviarReforcoApontamento', { ...session, colaboradorId, mensagem }),
+
+    gerarResumoIA: (session) => call('gerarResumoIA', session),
   };
 })();
 

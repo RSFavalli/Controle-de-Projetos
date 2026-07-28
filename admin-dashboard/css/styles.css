@@ -477,6 +477,29 @@ select, input[type="text"], input[type="email"], input[type="password"], input[t
 .departamento-chart__slice { transition: opacity 0.1s ease; }
 .departamento-chart__slice:hover { opacity: 0.85; }
 
+/* ---------------------- Resumo por IA ---------------------- */
+
+.resumo-ia {
+  margin-top: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-primary-light);
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.resumo-ia.loading {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.resumo-ia.error {
+  background: var(--color-danger-light);
+  color: var(--color-danger);
+  font-style: normal;
+}
+
 /* ---------------------- Mapa de calor ---------------------- */
 
 .heatmap-wrap { overflow-x: auto; }

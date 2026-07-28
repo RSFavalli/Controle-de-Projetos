@@ -97,6 +97,8 @@
     horasChartEmptyState: document.getElementById('horasChartEmptyState'),
     projetoChartContainer: document.getElementById('projetoChartContainer'),
     projetoChartEmptyState: document.getElementById('projetoChartEmptyState'),
+    gerarResumoIAButton: document.getElementById('gerarResumoIAButton'),
+    resumoIAResultado: document.getElementById('resumoIAResultado'),
   };
 
   /* --------------------------------- Init --------------------------------- */
@@ -162,6 +164,7 @@
       populateHorasFiltroProjetoSelect();
       renderCharts();
     });
+    els.gerarResumoIAButton.addEventListener('click', onGerarResumoIA);
   }
 
   function showScreen(name) {
@@ -1022,6 +1025,30 @@
     const h = Math.floor(totalMinutes / 60);
     const m = Math.round(totalMinutes % 60);
     return `${h}h${String(m).padStart(2, '0')}`;
+  }
+
+  async function onGerarResumoIA() {
+    els.gerarResumoIAButton.disabled = true;
+    els.resumoIAResultado.classList.remove('hidden', 'error');
+    els.resumoIAResultado.classList.add('loading');
+    els.resumoIAResultado.textContent = 'Gerando resumo com o Gemini (pode levar alguns segundos)...';
+
+    try {
+      const { resumo } = await Api.gerarResumoIA(state.session);
+      els.resumoIAResultado.classList.remove('loading');
+      els.resumoIAResultado.textContent = resumo;
+    } catch (err) {
+      if (isAuthError(err)) {
+        toast('Sessão expirada ou inválida. Faça login novamente.', 'error');
+        onLogout();
+        return;
+      }
+      els.resumoIAResultado.classList.remove('loading');
+      els.resumoIAResultado.classList.add('error');
+      els.resumoIAResultado.textContent = `Não foi possível gerar o resumo: ${err.message}`;
+    } finally {
+      els.gerarResumoIAButton.disabled = false;
+    }
   }
 
   /* ------------------------------- Utilitários ------------------------------- */

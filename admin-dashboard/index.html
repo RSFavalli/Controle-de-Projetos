@@ -280,6 +280,15 @@
         <p class="muted">Total e composição por atividade de cada projeto — sempre com todo o histórico, independente dos filtros acima.</p>
         <p id="projetoChartEmptyState" class="empty-state hidden">Nenhum apontamento concluído ainda.</p>
         <div id="projetoChartContainer" class="horas-chart-container"></div>
+
+        <h3 class="section-subheading">Resumo dos projetos por IA</h3>
+        <p class="muted">
+          Pede pro Gemini escrever um resumo de onde as horas estão concentradas, qual atividade domina em cada
+          projeto e quem é o principal recurso alocado. Os números são sempre calculados pelo sistema — a IA só
+          escreve o texto em cima deles. Cada clique gera uma chamada nova (tem custo, ainda que pequeno).
+        </p>
+        <button type="button" class="btn btn--start btn--small" id="gerarResumoIAButton">Gerar resumo</button>
+        <div id="resumoIAResultado" class="resumo-ia hidden"></div>
       </section>
 
     </section>

@@ -179,6 +179,19 @@ function enviarReforcoApontamento(admin, colaboradorId, mensagem) {
   return { enviado: true, para: colaborador.email };
 }
 
+function gerarResumoIA() {
+  // Stub local — não chama IA de verdade nem precisa de chave. Só pra testar
+  // o botão/tela do Dashboard sem depender do backend real.
+  const projetos = db.apontamentos.length;
+  return {
+    resumo:
+      '[Resumo simulado — mock-server.js não chama o Gemini de verdade] ' +
+      `Há ${projetos} apontamento(s) registrado(s) neste servidor local. No backend real, aqui apareceria um resumo ` +
+      'em texto gerado pela IA sobre como as horas estão distribuídas entre os projetos.',
+    projetos: 0,
+  };
+}
+
 function syncApontamentos(colaborador, entries, deletedIds) {
   entries = entries || [];
   deletedIds = deletedIds || [];
@@ -307,6 +320,10 @@ const server = http.createServer((req, res) => {
             data = enviarReforcoApontamento(admin, parsed.colaboradorId, parsed.mensagem);
             break;
           }
+          case 'gerarResumoIA':
+            requireAdmin(email, senha);
+            data = gerarResumoIA();
+            break;
           default:
             throw new Error('Ação desconhecida: ' + action);
         }
