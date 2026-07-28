@@ -40,10 +40,11 @@ const ADMIN_EMAIL = 'rafael.favalli@agricef.com.br';
 const APP_URL = 'https://rsfavalli.github.io/Controle-de-Projetos/';
 
 // Modelo do Gemini usado no resumo de projetos por IA (veja gerarResumoIA).
-// Se um dia parar de funcionar (modelo descontinuado), troque aqui — veja os
-// nomes disponíveis em https://aistudio.google.com/app/prompts (ou na doc da
-// API). A chave em si NÃO fica aqui: veja getGeminiApiKey().
-const GEMINI_MODEL = 'gemini-2.0-flash';
+// Se um dia parar de funcionar de novo (Google descontinua modelo com alguma
+// frequência), troque aqui — veja os nomes disponíveis em
+// https://ai.google.dev/gemini-api/docs/models. A chave em si NÃO fica aqui:
+// veja getGeminiApiKey().
+const GEMINI_MODEL = 'gemini-2.5-flash-lite';
 
 const HEADERS = {
   [SHEET_COLABORADORES]: ['id', 'nome', 'email', 'senha_hash', 'papel', 'cargo', 'ativo', 'criado_em'],

@@ -103,7 +103,7 @@ Isso é opcional — sem a chave configurada, o resto do sistema funciona normal
 
 Na primeira vez que o botão "Gerar resumo" for usado, o Google pode pedir uma autorização extra para o script **fazer chamadas a serviços externos** — é a mesma tela de sempre (Revisar permissões → Avançado → Permitir).
 
-Sobre custo: o Gemini tem camada gratuita; para o volume de uso daqui (um resumo curto por clique), é bem provável que fique dentro do limite grátis. Se o modelo `gemini-2.0-flash` (constante `GEMINI_MODEL` no topo do `Code.gs`) for descontinuado no futuro, troque o nome ali por um modelo atual — veja a lista em [aistudio.google.com](https://aistudio.google.com).
+Sobre custo: o Gemini tem camada gratuita, mas **só para contas pessoais (@gmail.com) — contas do Google Workspace (domínio próprio, tipo @agricef.com.br) não têm direito a ela** e mostram cota zerada até você vincular uma forma de pagamento ao projeto (em [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey), clique em "Configurar faturamento" ao lado da chave). Uma vez com faturamento ativo, o custo por uso, para o volume de uso daqui (um resumo curto por clique), tende a ficar bem baixo. Se o modelo `gemini-2.5-flash-lite` (constante `GEMINI_MODEL` no topo do `Code.gs`) for descontinuado no futuro — a Google costuma aposentar modelos com alguma frequência —, troque o nome ali por um modelo atual: veja a lista em [ai.google.dev/gemini-api/docs/models](https://ai.google.dev/gemini-api/docs/models).
 
 ## Sempre que você editar o Code.gs
 
