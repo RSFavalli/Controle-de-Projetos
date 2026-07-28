@@ -76,8 +76,11 @@ timesheet-app/
 - **Sincronização de apontamentos**: apontamentos sobem sozinhos para a planilha (login, reconexão, logo após iniciar/encerrar/editar/excluir um apontamento, e também pelo botão "Sincronizar") — inclusive os que ainda estão em andamento, para o Dashboard enxergar em tempo real quem está com algo em aberto. Um indicador ao lado do total mostra quantos ainda estão pendentes de envio. Exclusão de um apontamento já sincronizado também remove a linha correspondente na planilha.
 - **Painel de conformidade e alertas por e-mail** (Dashboard → aba Apontamentos): verificação automática (baseada em regras, não em IA generativa) de quem deixou de apontar ou de fechar uma atividade num dia útil — considerando fins de semana e feriados nacionais + municipais de Paulínia/SP. Manda lembrete automático por e-mail todo fim de dia útil, e permite reforço manual pelo Dashboard com base na frequência de pendências de cada colaborador. Respostas dos colaboradores caem no e-mail do admin.
 - **Gráfico de horas por atividade** (mesma aba): barras horizontais empilhadas, uma por colaborador, com horas e percentual de cada atividade. Ao lado, um gráfico de pizza (rosca) soma as horas de **todos** os colaboradores por atividade — visão do departamento como um todo.
-- **Filtros de horas** (período, cliente, projeto): os dois gráficos acima podem ser recortados por data, cliente e/ou projeto, para ver quanto tempo foi investido em cada frente específica.
+- **Filtros de horas** (período, cliente, projeto): a pizza do departamento, o mapa de calor e o gráfico por colaborador podem ser recortados por data, cliente e/ou projeto, para ver quanto tempo foi investido em cada frente específica.
+- **Mapa de calor — Colaboradores × Projetos**: quem está alocado em quê, com a cor mais escura quanto mais horas. Mostra todo mundo ativo e todo projeto ativo, mesmo sem dado no recorte (célula/linha vazia já é informação — ninguém alocado, por exemplo).
+- **Consumo de horas por projeto** (total + composição por atividade): proposital separado dos filtros acima — sempre olha o histórico completo, ordenado do projeto com mais horas para o com menos.
 - **Campo Cargo** nos colaboradores (opcional) — para futuramente agrupar horas por função além de por pessoa.
+- Nomes de clientes, projetos e colaboradores aparecem sempre em ordem alfabética nas listas, tabelas e eixos dos gráficos (projetos agrupados por cliente); rankings por métrica (conformidade, horas) continuam ordenados pelo valor, não pelo nome.
 
 ## O que falta (próximas etapas)
 

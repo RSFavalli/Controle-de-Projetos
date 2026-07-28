@@ -41,6 +41,11 @@
   --activity-5: #e87ba4;
   --activity-6: #008300;
 
+  /* Rampa sequencial (mesmo azul do slot 1) para o mapa de calor — mais
+     escuro = mais horas. */
+  --heat-min: #cde2fb;
+  --heat-max: #0d366b;
+
   font-size: 16px;
 }
 
@@ -471,6 +476,77 @@ select, input[type="text"], input[type="email"], input[type="password"], input[t
 
 .departamento-chart__slice { transition: opacity 0.1s ease; }
 .departamento-chart__slice:hover { opacity: 0.85; }
+
+/* ---------------------- Mapa de calor ---------------------- */
+
+.heatmap-wrap { overflow-x: auto; }
+
+table.heatmap {
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  min-width: 480px;
+}
+
+table.heatmap th, table.heatmap td {
+  padding: 6px 8px;
+  text-align: center;
+  border: 1px solid var(--color-surface);
+}
+
+table.heatmap thead th {
+  color: var(--color-text-muted);
+  font-weight: 600;
+  font-size: 0.72rem;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  height: 90px;
+  vertical-align: bottom;
+  padding-bottom: var(--space-2);
+  border: none;
+}
+
+table.heatmap tbody th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  padding-right: var(--space-3);
+  border: none;
+  font-size: 0.78rem;
+}
+table.heatmap tbody th span {
+  display: block;
+  font-weight: 400;
+  color: var(--color-text-muted);
+  font-size: 0.7rem;
+}
+
+table.heatmap td.cell {
+  border-radius: 4px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  min-width: 46px;
+}
+table.heatmap td.cell.empty {
+  background: var(--color-bg);
+  color: var(--color-border);
+  font-weight: 400;
+}
+
+.heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+.heatmap-legend .ramp {
+  width: 160px;
+  height: 10px;
+  border-radius: 5px;
+  background: linear-gradient(90deg, var(--heat-min), var(--heat-max));
+}
 
 /* ---------------------- Gráfico de horas por atividade ---------------------- */
 

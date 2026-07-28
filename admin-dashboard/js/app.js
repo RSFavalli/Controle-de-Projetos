@@ -90,8 +90,13 @@
     limparFiltroHorasButton: document.getElementById('limparFiltroHorasButton'),
     departamentoChartContainer: document.getElementById('departamentoChartContainer'),
     departamentoChartEmptyState: document.getElementById('departamentoChartEmptyState'),
+    heatmapTable: document.getElementById('heatmapTable'),
+    heatmapEmptyState: document.getElementById('heatmapEmptyState'),
+    heatmapLegend: document.getElementById('heatmapLegend'),
     horasChartContainer: document.getElementById('horasChartContainer'),
     horasChartEmptyState: document.getElementById('horasChartEmptyState'),
+    projetoChartContainer: document.getElementById('projetoChartContainer'),
+    projetoChartEmptyState: document.getElementById('projetoChartEmptyState'),
   };
 
   /* --------------------------------- Init --------------------------------- */
@@ -412,12 +417,13 @@
     els.projetosEmptyState.classList.toggle('hidden', state.projetos.length > 0);
 
     const clienteById = Object.fromEntries(state.clientes.map((c) => [c.id, c]));
+    const clienteNomeDe = (projeto) => (clienteById[projeto.clienteId] ? clienteById[projeto.clienteId].nome : '(cliente removido)');
 
     state.projetos
       .slice()
-      .sort((a, b) => a.nome.localeCompare(b.nome))
+      .sort((a, b) => clienteNomeDe(a).localeCompare(clienteNomeDe(b)) || a.nome.localeCompare(b.nome))
       .forEach((projeto) => {
-        const clienteNome = clienteById[projeto.clienteId] ? clienteById[projeto.clienteId].nome : '(cliente removido)';
+        const clienteNome = clienteNomeDe(projeto);
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>${escapeHtml(clienteNome)}</td>
@@ -530,6 +536,9 @@
       state.apontamentos = apontamentos;
       renderConformidade();
       renderCharts();
+      // Consumo de horas por projeto é proposital separado dos filtros de
+      // período/cliente/projeto — sempre olha o histórico completo.
+      renderProjetoChart();
     } catch (err) {
       if (isAuthError(err)) {
         toast('Sessão expirada ou inválida. Faça login novamente.', 'error');
@@ -590,6 +599,7 @@
   function renderCharts() {
     const filtrados = getFilteredApontamentosParaGraficos();
     renderDepartamentoChart(filtrados);
+    renderHeatmap(filtrados);
     renderHorasChart(filtrados);
   }
 
@@ -740,6 +750,85 @@
     els.horasChartContainer.appendChild(rows);
   }
 
+  /** Consumo de horas por projeto (total + composição por atividade) — mesmo
+   * padrão visual do gráfico por colaborador, mas agrupado por projeto.
+   * Proposital: NÃO usa os filtros de período/cliente/projeto (filtrar um
+   * gráfico organizado por projeto por "projeto" não faz sentido) — sempre
+   * olha o histórico completo, ordenado do maior para o menor total. */
+  function renderProjetoChart() {
+    const concluidos = state.apontamentos.filter((a) => a.duracaoMinutos != null && a.duracaoMinutos > 0);
+    els.projetoChartEmptyState.classList.toggle('hidden', concluidos.length > 0);
+    els.projetoChartContainer.innerHTML = '';
+    if (concluidos.length === 0) return;
+
+    const activities = window.APP_DATA.ACTIVITIES;
+    const colorFor = (index) => `var(--activity-${index + 1})`;
+
+    const porProjeto = {};
+    concluidos.forEach((a) => {
+      if (!porProjeto[a.projetoId]) {
+        porProjeto[a.projetoId] = { nome: a.projetoNome, cliente: a.clienteNome, porAtividade: {}, total: 0 };
+      }
+      const bucket = porProjeto[a.projetoId];
+      bucket.porAtividade[a.atividadeId] = (bucket.porAtividade[a.atividadeId] || 0) + a.duracaoMinutos;
+      bucket.total += a.duracaoMinutos;
+    });
+
+    const linhas = Object.values(porProjeto).sort((a, b) => b.total - a.total);
+    const maiorTotal = Math.max(...linhas.map((l) => l.total));
+
+    const legend = document.createElement('div');
+    legend.className = 'horas-chart__legend';
+    activities.forEach((act, i) => {
+      const item = document.createElement('span');
+      item.className = 'horas-chart__legend-item';
+      item.innerHTML = `<i style="background:${colorFor(i)}"></i>${escapeHtml(act.name)}`;
+      legend.appendChild(item);
+    });
+
+    const rows = document.createElement('div');
+    rows.className = 'horas-chart__rows';
+
+    linhas.forEach((linha) => {
+      const row = document.createElement('div');
+      row.className = 'horas-chart__row';
+
+      const label = document.createElement('div');
+      label.className = 'horas-chart__label';
+      label.innerHTML = `<span class="horas-chart__name">${escapeHtml(linha.nome)}</span><span class="horas-chart__total">${escapeHtml(linha.cliente)} · ${formatHm(linha.total)}</span>`;
+
+      const track = document.createElement('div');
+      track.className = 'horas-chart__track';
+      track.style.width = `${Math.max(6, (linha.total / maiorTotal) * 100)}%`;
+
+      activities.forEach((act, i) => {
+        const minutos = linha.porAtividade[act.id];
+        if (!minutos) return;
+        const fracao = minutos / linha.total;
+        const pct = formatPct(fracao);
+        const segment = document.createElement('div');
+        segment.className = 'horas-chart__segment';
+        segment.style.background = colorFor(i);
+        segment.style.flexBasis = `${fracao * 100}%`;
+        segment.title = `${linha.nome} — ${act.name}: ${formatHm(minutos)} (${pct})`;
+        if (fracao > 0.12) {
+          const segLabel = document.createElement('span');
+          segLabel.className = 'horas-chart__segment-label';
+          segLabel.textContent = `${formatHm(minutos)} · ${pct}`;
+          segment.appendChild(segLabel);
+        }
+        track.appendChild(segment);
+      });
+
+      row.appendChild(label);
+      row.appendChild(track);
+      rows.appendChild(row);
+    });
+
+    els.projetoChartContainer.appendChild(legend);
+    els.projetoChartContainer.appendChild(rows);
+  }
+
   /** Gráfico de pizza (donut) com as horas de TODOS os colaboradores somadas
    * por atividade — visão do departamento como um todo, respeitando os
    * mesmos filtros de período/cliente/projeto do gráfico por colaborador. */
@@ -841,6 +930,92 @@
 
   function formatPct(fracao) {
     return `${Math.round(fracao * 1000) / 10}%`;
+  }
+
+  /** Nome do cliente de um projeto, pra ordenar/rotular sem precisar buscar
+   * toda vez — cliente removido não quebra, só mostra um texto de aviso. */
+  function clienteNomeDoProjeto(projeto) {
+    if (!projeto) return '';
+    const cliente = state.clientes.find((c) => c.id === projeto.clienteId);
+    return cliente ? cliente.nome : '(cliente removido)';
+  }
+
+  /** Mapa de calor: linhas são os projetos (com o cliente embaixo do nome),
+   * colunas são os colaboradores — ambos sempre em ordem alfabética (projetos
+   * agrupados por cliente). Mostra todo mundo ativo, mesmo sem horas no
+   * período/filtro — uma linha ou coluna vazia já é informação útil (projeto
+   * sem ninguém alocado, ou colaborador sem apontamento no recorte). */
+  function renderHeatmap(apontamentos) {
+    const projetosAtivos = state.projetos
+      .filter((p) => p.ativo)
+      .slice()
+      .sort((a, b) => clienteNomeDoProjeto(a).localeCompare(clienteNomeDoProjeto(b)) || a.nome.localeCompare(b.nome));
+    const colaboradoresAtivos = state.colaboradores
+      .filter((c) => c.ativo)
+      .slice()
+      .sort((a, b) => a.nome.localeCompare(b.nome));
+
+    els.heatmapTable.innerHTML = '';
+    const semDados = projetosAtivos.length === 0 || colaboradoresAtivos.length === 0;
+    els.heatmapEmptyState.classList.toggle('hidden', !semDados);
+    els.heatmapLegend.classList.toggle('hidden', semDados);
+    if (semDados) return;
+
+    const minutosPorCelula = {};
+    let maiorMinutos = 0;
+    apontamentos
+      .filter((a) => a.duracaoMinutos != null && a.duracaoMinutos > 0)
+      .forEach((a) => {
+        const chave = `${a.projetoId}::${a.colaboradorId}`;
+        minutosPorCelula[chave] = (minutosPorCelula[chave] || 0) + a.duracaoMinutos;
+        if (minutosPorCelula[chave] > maiorMinutos) maiorMinutos = minutosPorCelula[chave];
+      });
+
+    const thead = document.createElement('thead');
+    const headRow = document.createElement('tr');
+    headRow.appendChild(document.createElement('th'));
+    colaboradoresAtivos.forEach((colaborador) => {
+      const th = document.createElement('th');
+      th.textContent = colaborador.nome;
+      headRow.appendChild(th);
+    });
+    thead.appendChild(headRow);
+    els.heatmapTable.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    projetosAtivos.forEach((projeto) => {
+      const tr = document.createElement('tr');
+      const th = document.createElement('th');
+      th.innerHTML = `${escapeHtml(projeto.nome)}<span>${escapeHtml(clienteNomeDoProjeto(projeto))}</span>`;
+      tr.appendChild(th);
+
+      colaboradoresAtivos.forEach((colaborador) => {
+        const minutos = minutosPorCelula[`${projeto.id}::${colaborador.id}`] || 0;
+        const td = document.createElement('td');
+        td.className = 'cell' + (minutos === 0 ? ' empty' : '');
+        if (minutos > 0) {
+          const fracao = maiorMinutos > 0 ? minutos / maiorMinutos : 0;
+          td.style.background = heatColor(fracao);
+          td.style.color = fracao > 0.55 ? '#fff' : 'var(--color-text)';
+          td.title = `${colaborador.nome} — ${clienteNomeDoProjeto(projeto)} / ${projeto.nome}: ${formatHm(minutos)}`;
+          td.textContent = formatHm(minutos);
+        } else {
+          td.textContent = '–';
+        }
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    els.heatmapTable.appendChild(tbody);
+  }
+
+  /** Interpola a rampa sequencial --heat-min → --heat-max conforme a fração
+   * (0 a 1) do maior valor da matriz. */
+  function heatColor(fracao) {
+    const min = [0xcd, 0xe2, 0xfb];
+    const max = [0x0d, 0x36, 0x6b];
+    const rgb = min.map((c, i) => Math.round(c + (max[i] - c) * fracao));
+    return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
   }
 
   function formatHm(totalMinutes) {

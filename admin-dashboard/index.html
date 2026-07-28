@@ -260,9 +260,26 @@
         <p id="departamentoChartEmptyState" class="empty-state hidden">Nenhum apontamento concluído no período/filtro selecionado.</p>
         <div id="departamentoChartContainer" class="departamento-chart-container"></div>
 
+        <h3 class="section-subheading">Mapa de calor — Colaboradores × Projetos</h3>
+        <p class="muted">Horas de cada colaborador em cada projeto, respeitando os filtros acima. Quanto mais escura a célula, mais horas.</p>
+        <p id="heatmapEmptyState" class="empty-state hidden">Nenhum apontamento concluído no período/filtro selecionado.</p>
+        <div class="heatmap-wrap">
+          <table class="heatmap" id="heatmapTable"></table>
+        </div>
+        <div id="heatmapLegend" class="heatmap-legend hidden">
+          <span>Menos horas</span>
+          <span class="ramp"></span>
+          <span>Mais horas</span>
+        </div>
+
         <h3 class="section-subheading">Distribuição de horas por colaborador</h3>
         <p id="horasChartEmptyState" class="empty-state hidden">Nenhum apontamento concluído no período/filtro selecionado.</p>
         <div id="horasChartContainer" class="horas-chart-container"></div>
+
+        <h3 class="section-subheading">Consumo de horas por projeto</h3>
+        <p class="muted">Total e composição por atividade de cada projeto — sempre com todo o histórico, independente dos filtros acima.</p>
+        <p id="projetoChartEmptyState" class="empty-state hidden">Nenhum apontamento concluído ainda.</p>
+        <div id="projetoChartContainer" class="horas-chart-container"></div>
       </section>
 
     </section>
