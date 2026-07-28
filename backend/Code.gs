@@ -44,7 +44,7 @@ const APP_URL = 'https://rsfavalli.github.io/Controle-de-Projetos/';
 // frequência), troque aqui — veja os nomes disponíveis em
 // https://ai.google.dev/gemini-api/docs/models. A chave em si NÃO fica aqui:
 // veja getGeminiApiKey().
-const GEMINI_MODEL = 'gemini-2.5-flash-lite';
+const GEMINI_MODEL = 'gemini-3.5-flash-lite';
 
 const HEADERS = {
   [SHEET_COLABORADORES]: ['id', 'nome', 'email', 'senha_hash', 'papel', 'cargo', 'ativo', 'criado_em'],
