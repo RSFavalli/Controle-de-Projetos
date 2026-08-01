@@ -21,6 +21,7 @@
   const END_OF_DAY_HOUR = 18; // a partir dessa hora, avisa sobre atividade aberta
 
   let inMemorySenha = null; // só dura enquanto a aba estiver aberta
+  let alertsIntervalId = null;
 
   const els = {
     clientSelect: document.getElementById('clientSelect'),
@@ -241,7 +242,8 @@
     updateSyncStatusUi();
     refreshAppUi();
     Timer.startTicking(tickClock);
-    setInterval(renderAlerts, 60 * 1000);
+    if (alertsIntervalId) clearInterval(alertsIntervalId);
+    alertsIntervalId = setInterval(renderAlerts, 60 * 1000);
   }
 
   /* ------------------------------ Sincronização ----------------------------- */

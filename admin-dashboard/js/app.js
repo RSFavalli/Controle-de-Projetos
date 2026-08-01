@@ -74,6 +74,7 @@
     colaboradorPapel: document.getElementById('colaboradorPapel'),
     colaboradorCargo: document.getElementById('colaboradorCargo'),
     colaboradorAtivo: document.getElementById('colaboradorAtivo'),
+    colaboradorObrigatorioApontamento: document.getElementById('colaboradorObrigatorioApontamento'),
     cancelColaboradorButton: document.getElementById('cancelColaboradorButton'),
     colaboradoresTableBody: document.getElementById('colaboradoresTableBody'),
     colaboradoresEmptyState: document.getElementById('colaboradoresEmptyState'),
@@ -99,11 +100,26 @@
     projetoChartEmptyState: document.getElementById('projetoChartEmptyState'),
     gerarResumoIAButton: document.getElementById('gerarResumoIAButton'),
     resumoIAResultado: document.getElementById('resumoIAResultado'),
+    exportPdfButton: document.getElementById('exportPdfButton'),
+    printReportHeaderMeta: document.getElementById('printReportHeaderMeta'),
+    themeToggleButton: document.getElementById('themeToggleButton'),
   };
+
+  const THEME_STORAGE_KEY = 'timesheet_admin_theme';
 
   /* --------------------------------- Init --------------------------------- */
 
+  function initTheme() {
+    els.themeToggleButton.addEventListener('click', () => {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      const next = isDark ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem(THEME_STORAGE_KEY, next);
+    });
+  }
+
   function init() {
+    initTheme();
     wireStaticHandlers();
 
     const savedUrl = Api.getBaseUrl();
@@ -131,6 +147,7 @@
     els.logoutButton.addEventListener('click', onLogout);
 
     els.tabButtons.forEach((btn) => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
+    els.exportPdfButton.addEventListener('click', exportReportPdf);
 
     // Clientes
     els.newClienteButton.addEventListener('click', () => openClienteForm());
@@ -288,6 +305,39 @@
     if (tabName === 'apontamentos') {
       loadApontamentos();
     }
+  }
+
+  /**
+   * Exporta um relatório em PDF (via impressão do navegador, sempre em modo
+   * claro — ver regras @media print em css/styles.css) reunindo as análises
+   * das abas de gestão de equipe, independente de qual aba está ativa no
+   * momento. Hoje só existe a aba Apontamentos; quando a aba Equipe (ver
+   * esboço validado) for implementada de verdade, adicione seu id de painel
+   * (ex.: 'tab-equipe') a REPORT_PANEL_IDS abaixo.
+   */
+  async function exportReportPdf() {
+    const REPORT_PANEL_IDS = ['tab-apontamentos'];
+
+    await loadApontamentos();
+
+    const panels = Array.from(document.querySelectorAll('.tab-panel'));
+    const previouslyHidden = panels.map((panel) => panel.classList.contains('hidden'));
+    panels.forEach((panel) => {
+      panel.classList.toggle('hidden', !REPORT_PANEL_IDS.includes(panel.id));
+    });
+
+    const agora = new Date();
+    els.printReportHeaderMeta.textContent =
+      `Relatório gerado em ${agora.toLocaleDateString('pt-BR')} às ` +
+      `${agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+
+    const restore = () => {
+      panels.forEach((panel, i) => panel.classList.toggle('hidden', previouslyHidden[i]));
+      window.removeEventListener('afterprint', restore);
+    };
+    window.addEventListener('afterprint', restore);
+
+    window.print();
   }
 
   /* -------------------------------- Clientes -------------------------------- */
@@ -458,6 +508,7 @@
       els.colaboradorPapel.value = colaborador.papel;
       els.colaboradorCargo.value = colaborador.cargo || '';
       els.colaboradorAtivo.checked = colaborador.ativo;
+      els.colaboradorObrigatorioApontamento.checked = colaborador.obrigatorioApontamento !== false;
       els.colaboradorSenha.placeholder = 'Deixe em branco para manter a atual';
     } else {
       els.colaboradorId.value = '';
@@ -466,6 +517,7 @@
       els.colaboradorPapel.value = 'colaborador';
       els.colaboradorCargo.value = '';
       els.colaboradorAtivo.checked = true;
+      els.colaboradorObrigatorioApontamento.checked = true;
       els.colaboradorSenha.placeholder = 'Senha inicial';
     }
     els.colaboradorNome.focus();
@@ -481,6 +533,7 @@
       papel: els.colaboradorPapel.value,
       cargo: els.colaboradorCargo.value.trim(),
       ativo: els.colaboradorAtivo.checked,
+      obrigatorioApontamento: els.colaboradorObrigatorioApontamento.checked,
     };
     if (els.colaboradorSenha.value) {
       payload.senha = els.colaboradorSenha.value;
@@ -513,6 +566,7 @@
           <td>${escapeHtml(colaborador.email)}</td>
           <td>${escapeHtml(colaborador.cargo || '—')}</td>
           <td>${colaborador.papel === 'admin' ? '<span class="role-pill">Admin</span>' : 'Colaborador'}</td>
+          <td>${colaborador.obrigatorioApontamento !== false ? 'Obrigatório' : 'Isento'}</td>
           <td>${statusPill(colaborador.ativo)}</td>
           <td></td>
         `;
@@ -610,7 +664,7 @@
     const dias = Number(els.apontamentosRangeSelect.value);
     const businessDays = Holidays.lastBusinessDays(dias);
     const hoje = Holidays.dateStr(new Date());
-    const ativos = state.colaboradores.filter((c) => c.ativo);
+    const ativos = state.colaboradores.filter((c) => c.ativo && c.obrigatorioApontamento !== false);
 
     const linhas = ativos.map((colaborador) => {
       const doColaborador = state.apontamentos.filter((a) => a.colaboradorId === colaborador.id);

@@ -5,20 +5,44 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Timesheet — Dashboard Admin</title>
   <link rel="stylesheet" href="css/styles.css" />
+  <script>
+    // Aplica o tema salvo antes do primeiro paint, pra não piscar claro→escuro.
+    (function () {
+      var saved = localStorage.getItem('timesheet_admin_theme');
+      if (saved === 'dark' || saved === 'light') {
+        document.documentElement.setAttribute('data-theme', saved);
+      }
+    })();
+  </script>
 </head>
 <body>
 
+  <div class="watermark" aria-hidden="true"></div>
+
   <header class="admin-header">
     <div class="admin-header__brand">
-      <span class="admin-header__logo" aria-hidden="true">⚙️</span>
+      <img class="admin-header__logo-empresa" src="assets/Agricef - Logo Empresa.png" alt="Agricef" />
+      <span class="admin-header__divider" aria-hidden="true"></span>
+      <img class="admin-header__logo-exa" src="assets/Agricef - .png" alt="EXA — Experimentação Agrícola" />
       <div>
-        <h1>Timesheet — Dashboard Admin</h1>
-        <p class="admin-header__subtitle">Gestão de clientes, projetos e colaboradores</p>
+        <h1>Gestão de Pessoas</h1>
+        <p class="admin-header__subtitle">Clientes, projetos, colaboradores e apontamentos</p>
       </div>
     </div>
-    <div id="sessionInfo" class="admin-header__session hidden">
-      <span id="sessionUserName"></span>
-      <button id="logoutButton" class="btn btn--ghost btn--small">Sair</button>
+    <div class="admin-header__actions">
+      <button type="button" id="themeToggleButton" class="theme-toggle" aria-label="Alternar tema claro/escuro" title="Alternar tema claro/escuro">
+        <svg class="theme-toggle__icon theme-toggle__icon--sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+          <circle cx="12" cy="12" r="4.2" />
+          <path d="M12 2.5v2.4M12 19.1v2.4M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.6 19.4l1.7-1.7M17.7 6.3l1.7-1.7" stroke-linecap="round" />
+        </svg>
+        <svg class="theme-toggle__icon theme-toggle__icon--moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+          <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.8 6.8 0 0 0 10.5 10.5Z" stroke-linejoin="round" />
+        </svg>
+      </button>
+      <div id="sessionInfo" class="admin-header__session hidden">
+        <span id="sessionUserName"></span>
+        <button id="logoutButton" class="btn btn--ghost btn--small">Sair</button>
+      </div>
     </div>
   </header>
 
@@ -64,12 +88,33 @@
     <!-- ------------------------------ Dashboard ------------------------------ -->
     <section id="dashboardScreen" class="hidden">
 
-      <nav class="tabs" role="tablist">
-        <button class="tab-button is-active" data-tab="clientes" role="tab">Clientes</button>
-        <button class="tab-button" data-tab="projetos" role="tab">Projetos</button>
-        <button class="tab-button" data-tab="colaboradores" role="tab">Colaboradores</button>
-        <button class="tab-button" data-tab="apontamentos" role="tab">Apontamentos</button>
-      </nav>
+      <div class="tabs-bar">
+        <nav class="tabs" role="tablist">
+          <button class="tab-button is-active" data-tab="clientes" role="tab">
+            <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 20V6.8c0-.8.6-1.5 1.4-1.7l6-1.5a1.7 1.7 0 0 1 2.2 1.6V20M4 20h16M9 20v-4.2c0-.5.4-.8.8-.8h1.4c.4 0 .8.3.8.8V20M14 20V9.5c0-.5.4-.9.9-.9h3.2c.5 0 .9.4.9.9V20" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            Clientes
+          </button>
+          <button class="tab-button" data-tab="projetos" role="tab">
+            <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 5.5c0-.6.4-1 1-1h4l1.6 2h8.4c.6 0 1 .4 1 1v10.9c0 .6-.4 1-1 1H5c-.6 0-1-.4-1-1V5.5Z" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            Projetos
+          </button>
+          <button class="tab-button" data-tab="colaboradores" role="tab">
+            <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="9" cy="8" r="3.2" /><path d="M3.5 19c.6-3.2 3-5 5.5-5s4.9 1.8 5.5 5M15.5 6.8a3 3 0 0 1 0 5.9M18 13.6c2.1.4 3.7 2 4.2 4.9" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            Colaboradores
+          </button>
+          <button class="tab-button" data-tab="apontamentos" role="tab">
+            <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            Apontamentos
+          </button>
+        </nav>
+        <button type="button" class="btn btn--ghost btn--small no-print" id="exportPdfButton">Exportar PDF</button>
+      </div>
+
+      <!-- Só aparece na impressão/exportação em PDF — ver Dashboard.exportReportPdf() em js/app.js -->
+      <div id="printReportHeader" class="print-report-header">
+        <p class="print-report-header__title">Gestão de Pessoas — Agricef, Experimentação Agrícola</p>
+        <p id="printReportHeaderMeta" class="print-report-header__meta"></p>
+      </div>
 
       <!-- ---------------- Clientes ---------------- -->
       <section id="tab-clientes" class="tab-panel card">
@@ -176,6 +221,9 @@
           <div class="field field--checkbox">
             <label><input type="checkbox" id="colaboradorAtivo" checked /> Ativo</label>
           </div>
+          <div class="field field--checkbox">
+            <label><input type="checkbox" id="colaboradorObrigatorioApontamento" checked /> Obrigado a apontar horas</label>
+          </div>
           <div class="inline-form__actions">
             <button type="submit" class="btn btn--start btn--small">Salvar</button>
             <button type="button" class="btn btn--ghost btn--small" id="cancelColaboradorButton">Cancelar</button>
@@ -185,7 +233,7 @@
         <div class="table-wrapper">
           <table class="data-table">
             <thead>
-              <tr><th>Nome</th><th>E-mail</th><th>Cargo</th><th>Perfil</th><th>Status</th><th></th></tr>
+              <tr><th>Nome</th><th>E-mail</th><th>Cargo</th><th>Perfil</th><th>Apontamento</th><th>Status</th><th></th></tr>
             </thead>
             <tbody id="colaboradoresTableBody"></tbody>
           </table>
@@ -287,7 +335,7 @@
           projeto e quem é o principal recurso alocado. Os números são sempre calculados pelo sistema — a IA só
           escreve o texto em cima deles. Cada clique gera uma chamada nova (tem custo, ainda que pequeno).
         </p>
-        <button type="button" class="btn btn--start btn--small" id="gerarResumoIAButton">Gerar resumo</button>
+        <button type="button" class="btn btn--start btn--small no-print" id="gerarResumoIAButton">Gerar resumo</button>
         <div id="resumoIAResultado" class="resumo-ia hidden"></div>
       </section>
 
@@ -296,7 +344,10 @@
   </main>
 
   <footer class="admin-footer">
-    <p>Dados armazenados em uma planilha do Google Sheets, acessada via Google Apps Script. Veja <code>backend/SETUP.md</code> para detalhes.</p>
+    <p class="admin-footer__title">Gestão de Pessoas — Agricef, Experimentação Agrícola</p>
+    <p class="admin-footer__meta">Desenvolvido por Rafael de Souza Favalli · Julho de 2026 · última atualização em Agosto de 2026</p>
+    <p class="admin-footer__notice">Dashboard em fase de implementação — os resultados apresentados estão sujeitos a revisão.</p>
+    <p class="admin-footer__tech">Dados armazenados em uma planilha do Google Sheets, acessada via Google Apps Script. Veja <code>backend/SETUP.md</code> para detalhes.</p>
   </footer>
 
   <script src="js/data.js"></script>

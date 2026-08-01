@@ -7,7 +7,8 @@
  * Abas esperadas na planilha (crie-as com esses nomes EXATOS, ou rode
  * a função seedDatabase() uma vez, que cria tudo automaticamente):
  *
- *   Colaboradores: id | nome | email | senha_hash | papel | cargo | ativo | criado_em
+ *   Colaboradores: id | nome | email | senha_hash | papel | cargo | ativo |
+ *                  obrigatorio_apontamento | criado_em
  *   Clientes:      id | nome | ativo | criado_em
  *   Projetos:      id | cliente_id | nome | ativo | criado_em
  *   Apontamentos:  id | colaborador_id | colaborador_nome | cliente_id | cliente_nome |
@@ -47,7 +48,7 @@ const APP_URL = 'https://rsfavalli.github.io/Controle-de-Projetos/';
 const GEMINI_MODEL = 'gemini-3.5-flash-lite';
 
 const HEADERS = {
-  [SHEET_COLABORADORES]: ['id', 'nome', 'email', 'senha_hash', 'papel', 'cargo', 'ativo', 'criado_em'],
+  [SHEET_COLABORADORES]: ['id', 'nome', 'email', 'senha_hash', 'papel', 'cargo', 'ativo', 'obrigatorio_apontamento', 'criado_em'],
   [SHEET_CLIENTES]: ['id', 'nome', 'ativo', 'criado_em'],
   [SHEET_PROJETOS]: ['id', 'cliente_id', 'nome', 'ativo', 'criado_em'],
   [SHEET_APONTAMENTOS]: [
@@ -264,6 +265,7 @@ function listColaboradores() {
     papel: c.papel,
     cargo: c.cargo || '',
     ativo: normalizeBool(c.ativo),
+    obrigatorioApontamento: isObrigadoApontamento(c),
     criadoEm: c.criado_em,
     // senha_hash nunca é devolvida ao front-end.
   }));
@@ -298,10 +300,13 @@ function saveColaborador(input) {
       papel: input.papel,
       cargo: input.cargo !== undefined ? input.cargo : existing.cargo || '',
       ativo: input.ativo !== undefined ? input.ativo : normalizeBool(existing.ativo),
+      obrigatorio_apontamento: input.obrigatorioApontamento !== undefined
+        ? input.obrigatorioApontamento
+        : isObrigadoApontamento(existing),
       criado_em: existing.criado_em,
     };
     writeRow(sheet, idx + 2, updated);
-    return { ...updated, ativo: normalizeBool(updated.ativo), senha_hash: undefined };
+    return { ...updated, ativo: normalizeBool(updated.ativo), obrigatorioApontamento: normalizeBool(updated.obrigatorio_apontamento), senha_hash: undefined };
   }
 
   // Criação
@@ -317,10 +322,11 @@ function saveColaborador(input) {
     papel: input.papel,
     cargo: input.cargo || '',
     ativo: input.ativo !== undefined ? input.ativo : true,
+    obrigatorio_apontamento: input.obrigatorioApontamento !== undefined ? input.obrigatorioApontamento : true,
     criado_em: new Date().toISOString(),
   };
   appendRow(sheet, novo);
-  return { ...novo, senha_hash: undefined };
+  return { ...novo, ativo: normalizeBool(novo.ativo), obrigatorioApontamento: normalizeBool(novo.obrigatorio_apontamento), senha_hash: undefined };
 }
 
 function findColaboradorByEmail(email) {
@@ -631,7 +637,7 @@ function formatDateStr(date) {
  */
 function pendenciasDoDia(dateStr) {
   ensureHeaders(SHEET_APONTAMENTOS);
-  const colaboradores = sheetToObjects(SHEET_COLABORADORES).filter((c) => normalizeBool(c.ativo));
+  const colaboradores = sheetToObjects(SHEET_COLABORADORES).filter((c) => normalizeBool(c.ativo) && isObrigadoApontamento(c));
   const apontamentosDoDia = sheetToObjects(SHEET_APONTAMENTOS).filter((a) => asDateStr(a.data) === dateStr);
 
   return colaboradores
@@ -971,6 +977,14 @@ function normalizeBool(v) {
   if (typeof v === 'boolean') return v;
   if (typeof v === 'string') return v.toUpperCase() === 'TRUE';
   return !!v;
+}
+
+// Colaboradores salvos antes deste campo existir ficam com a coluna em
+// branco — trata como obrigatório por padrão; só vira "isento" quando
+// explicitamente marcado como false.
+function isObrigadoApontamento(c) {
+  const v = c.obrigatorio_apontamento;
+  return v === '' || v === undefined ? true : normalizeBool(v);
 }
 
 /* ========================================================================

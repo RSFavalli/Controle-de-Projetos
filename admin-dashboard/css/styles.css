@@ -46,7 +46,54 @@
   --heat-min: #cde2fb;
   --heat-max: #0d366b;
 
+  /* Status semântico (conformidade de apontamento) — paleta fixa, nunca
+     reaproveitada para outra coisa, sempre acompanhada de ícone + texto. */
+  --status-good: #0ca30c;
+  --status-good-bg: #e3f7e3;
+  --status-warning: #8a6d1a;
+  --status-warning-bg: #fdf0d9;
+  --status-critical: #b3271f;
+  --status-critical-bg: #fbe3e3;
+
+  /* Verde neon — só pra realces pontuais (foco, glow de estado ativo),
+     nunca como cor de texto/preenchimento de área grande. */
+  --color-neon: #39ff8f;
+  --glow-neon: 0 0 0 3px rgba(57, 255, 143, 0.22);
+
+  --transition-fast: 120ms ease;
+
   font-size: 16px;
+}
+
+:root[data-theme="dark"] {
+  --color-primary: #2fa17c;
+  --color-primary-dark: #7fe0bd;
+  --color-primary-light: #163a2f;
+  --color-danger: #e0714a;
+  --color-danger-light: #3d241c;
+  --color-warning: #d9a83a;
+  --color-warning-light: #3a3016;
+  --color-success: #2fa17c;
+  --color-text: #eef2f0;
+  --color-text-muted: #9fada7;
+  --color-border: #2a332e;
+  --color-bg: #12140f;
+  --color-surface: #1a1e19;
+
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+
+  --status-good: #4ade80;
+  --status-good-bg: #123d24;
+  --status-warning: #e8c15a;
+  --status-warning-bg: #3a3016;
+  --status-critical: #f0796b;
+  --status-critical-bg: #3d1c18;
+
+  --heat-min: #17324f;
+  --heat-max: #62b4ff;
+
+  --glow-neon: 0 0 0 3px rgba(57, 255, 143, 0.32);
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -58,6 +105,8 @@ body {
   color: var(--color-text);
   line-height: 1.45;
   padding-bottom: var(--space-6);
+  transition: background var(--transition-fast), color var(--transition-fast);
+  position: relative;
 }
 
 h1, h2 { margin: 0; line-height: 1.25; }
@@ -90,9 +139,27 @@ code {
   gap: var(--space-3);
 }
 
-.admin-header__logo { font-size: 1.6rem; }
+.admin-header__logo-empresa { height: 30px; width: auto; display: block; }
+.admin-header__logo-exa { height: 42px; width: auto; display: block; transition: filter var(--transition-fast); }
+
+/* A logo da EXA é em cinza-escuro sobre fundo transparente — inverte pra
+   ficar clara e legível sobre o header escuro do tema dark. */
+:root[data-theme="dark"] .admin-header__logo-exa { filter: invert(1) brightness(1.15); }
+
+.admin-header__divider {
+  width: 1px;
+  height: 28px;
+  background: var(--color-border);
+}
+
 .admin-header h1 { font-size: 1.15rem; color: var(--color-primary-dark); }
 .admin-header__subtitle { margin: 0; font-size: 0.82rem; color: var(--color-text-muted); }
+
+.admin-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
 
 .admin-header__session {
   display: flex;
@@ -100,6 +167,72 @@ code {
   gap: var(--space-3);
   font-size: 0.88rem;
   font-weight: 600;
+}
+
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.theme-toggle:hover,
+.theme-toggle:focus-visible {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.theme-toggle:focus-visible { outline: none; box-shadow: var(--glow-neon); }
+
+.theme-toggle__icon { width: 18px; height: 18px; }
+.theme-toggle__icon--moon { display: none; }
+:root[data-theme="dark"] .theme-toggle__icon--sun { display: none; }
+:root[data-theme="dark"] .theme-toggle__icon--moon { display: block; }
+
+/* ------------------------------ Marca d'água ------------------------------ */
+
+.watermark {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.watermark::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: -4%;
+  width: min(46vw, 560px);
+  aspect-ratio: 713 / 636;
+  transform: translateY(-50%);
+  background: var(--color-primary);
+  opacity: 0.05;
+  -webkit-mask-image: url('../assets/Agricef - Logo Folha.png');
+  mask-image: url('../assets/Agricef - Logo Folha.png');
+  -webkit-mask-mode: luminance;
+  mask-mode: luminance;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  mask-position: center;
+  transition: background var(--transition-fast);
+}
+
+:root[data-theme="dark"] .watermark::after {
+  opacity: 0.06;
+  background: var(--color-neon);
 }
 
 /* ------------------------------- Main -------------------------------- */
@@ -115,9 +248,11 @@ code {
 
 .card {
   background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
   padding: var(--space-5);
+  transition: background var(--transition-fast), border-color var(--transition-fast);
 }
 
 .card h2 {
@@ -200,7 +335,8 @@ code {
   font-weight: 500;
 }
 
-select, input[type="text"], input[type="email"], input[type="password"], input[type="url"] {
+select, input[type="text"], input[type="email"], input[type="password"], input[type="url"],
+input[type="number"], input[type="date"] {
   font: inherit;
   padding: var(--space-3);
   border: 1px solid var(--color-border);
@@ -208,6 +344,13 @@ select, input[type="text"], input[type="email"], input[type="password"], input[t
   background: var(--color-surface);
   color: var(--color-text);
   width: 100%;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+select:focus-visible, input:focus-visible, textarea:focus-visible {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: var(--glow-neon);
 }
 
 .btn {
@@ -219,8 +362,9 @@ select, input[type="text"], input[type="email"], input[type="password"], input[t
   cursor: pointer;
 }
 
-.btn--start { background: var(--color-primary); color: #fff; }
-.btn--start:hover { background: var(--color-primary-dark); }
+.btn--start { background: var(--color-primary); color: #fff; transition: filter var(--transition-fast), box-shadow var(--transition-fast); }
+.btn--start:hover { filter: brightness(0.9); }
+.btn--start:focus-visible { outline: none; box-shadow: var(--glow-neon); }
 
 .btn--ghost {
   background: transparent;
@@ -243,6 +387,14 @@ select, input[type="text"], input[type="email"], input[type="password"], input[t
 
 /* --------------------------------- Tabs --------------------------------- */
 
+.tabs-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
 .tabs {
   display: flex;
   gap: var(--space-2);
@@ -250,7 +402,73 @@ select, input[type="text"], input[type="email"], input[type="password"], input[t
   flex-wrap: wrap;
 }
 
+/* ---------------------- Exportação em PDF (impressão) ---------------------- */
+
+.print-report-header { display: none; }
+
+@media print {
+  .no-print,
+  .admin-header__session,
+  .tabs-bar > .tabs,
+  .watermark,
+  .theme-toggle,
+  form,
+  .panel-header__controls,
+  .row-actions {
+    display: none !important;
+  }
+
+  /* Força o visual claro no PDF mesmo que o dashboard esteja no tema escuro. */
+  :root, :root[data-theme="dark"] {
+    --color-primary: #1f6f54;
+    --color-primary-dark: #16503d;
+    --color-primary-light: #e6f2ee;
+    --color-text: #1e2422;
+    --color-text-muted: #5c6863;
+    --color-border: #d9e0dc;
+    --color-bg: #ffffff;
+    --color-surface: #ffffff;
+    --status-good: #0ca30c;
+    --status-good-bg: #e3f7e3;
+    --status-warning: #8a6d1a;
+    --status-warning-bg: #fdf0d9;
+    --status-critical: #b3271f;
+    --status-critical-bg: #fbe3e3;
+  }
+
+  .admin-header__logo-exa { filter: none !important; }
+
+  body { padding-bottom: 0; }
+  .admin-main { max-width: 100%; padding: 0; }
+  .card { box-shadow: none; border: 1px solid var(--color-border); break-inside: avoid; }
+  .tab-panel.hidden { display: none !important; }
+  .tab-panel:not(.hidden) { display: block !important; }
+
+  .print-report-header {
+    display: block;
+    margin-bottom: var(--space-4);
+    padding-bottom: var(--space-3);
+    border-bottom: 2px solid var(--color-primary);
+  }
+
+  .print-report-header__title {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--color-primary-dark);
+  }
+
+  .print-report-header__meta {
+    margin: var(--space-1) 0 0;
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+  }
+}
+
 .tab-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
   font: inherit;
   font-weight: 600;
   padding: var(--space-2) var(--space-4);
@@ -261,10 +479,22 @@ select, input[type="text"], input[type="email"], input[type="password"], input[t
   cursor: pointer;
 }
 
+.tab-icon { width: 16px; height: 16px; flex-shrink: 0; }
+
+.tab-button {
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
 .tab-button.is-active {
   background: var(--color-primary);
   border-color: var(--color-primary);
   color: #fff;
+  box-shadow: 0 0 10px rgba(57, 255, 143, 0.28);
+}
+
+.tab-button:focus-visible {
+  outline: none;
+  box-shadow: var(--glow-neon);
 }
 
 /* ------------------------------ Panel/forms ------------------------------ */
@@ -371,9 +601,9 @@ select, input[type="text"], input[type="email"], input[type="password"], input[t
 
 /* Status semântico (conformidade de apontamento) — paleta fixa, nunca reaproveitada
    para outra coisa, sempre acompanhada de ícone + texto (nunca só a cor). */
-.status-pill--good { background: #e3f7e3; color: #0ca30c; }
-.status-pill--warning { background: #fdf0d9; color: #8a6d1a; }
-.status-pill--critical { background: #fbe3e3; color: #b3271f; }
+.status-pill--good { background: var(--status-good-bg); color: var(--status-good); }
+.status-pill--warning { background: var(--status-warning-bg); color: var(--status-warning); }
+.status-pill--critical { background: var(--status-critical-bg); color: var(--status-critical); }
 
 .row-actions { display: flex; gap: var(--space-2); }
 
@@ -396,11 +626,30 @@ select, input[type="text"], input[type="email"], input[type="password"], input[t
 
 .admin-footer {
   max-width: 1000px;
-  margin: 0 auto;
-  padding: 0 var(--space-4);
+  margin: var(--space-4) auto 0;
+  padding: var(--space-4) var(--space-4) var(--space-5);
+  border-top: 1px solid var(--color-border);
   font-size: 0.78rem;
   color: var(--color-text-muted);
   text-align: center;
+}
+
+.admin-footer p { margin: 0 0 var(--space-1); }
+.admin-footer p:last-child { margin-bottom: 0; }
+
+.admin-footer__title {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--color-primary-dark);
+}
+
+.admin-footer__notice {
+  font-style: italic;
+}
+
+.admin-footer__tech {
+  margin-top: var(--space-2) !important;
+  opacity: 0.75;
 }
 
 /* ---------------------- Filtro de horas ---------------------- */

@@ -73,9 +73,10 @@ const db = {
 function login(email, senha) {
   if (!email || !senha) throw new Error('Informe e-mail e senha.');
   const colaborador = db.colaboradores.find((c) => c.email.toLowerCase() === String(email).toLowerCase());
-  if (!colaborador) throw new Error('E-mail ou senha inválidos.');
+  if (!colaborador || colaborador.senha_hash !== hashPassword(senha)) {
+    throw new Error('E-mail ou senha inválidos.');
+  }
   if (!colaborador.ativo) throw new Error('Este colaborador está inativo.');
-  if (colaborador.senha_hash !== hashPassword(senha)) throw new Error('E-mail ou senha inválidos.');
   return { id: colaborador.id, nome: colaborador.nome, email: colaborador.email, papel: colaborador.papel };
 }
 
@@ -108,6 +109,9 @@ function saveColaborador(input) {
     existing.papel = input.papel;
     existing.cargo = input.cargo !== undefined ? input.cargo : existing.cargo || '';
     existing.ativo = input.ativo !== undefined ? input.ativo : existing.ativo;
+    existing.obrigatorioApontamento = input.obrigatorioApontamento !== undefined
+      ? input.obrigatorioApontamento
+      : (existing.obrigatorioApontamento !== undefined ? existing.obrigatorioApontamento : true);
     const { senha_hash, ...rest } = existing;
     return rest;
   }
@@ -123,6 +127,7 @@ function saveColaborador(input) {
     papel: input.papel,
     cargo: input.cargo || '',
     ativo: input.ativo !== undefined ? input.ativo : true,
+    obrigatorioApontamento: input.obrigatorioApontamento !== undefined ? input.obrigatorioApontamento : true,
     criado_em: new Date().toISOString(),
   };
   db.colaboradores.push(novo);
@@ -182,13 +187,14 @@ function enviarReforcoApontamento(admin, colaboradorId, mensagem) {
 function gerarResumoIA() {
   // Stub local — não chama IA de verdade nem precisa de chave. Só pra testar
   // o botão/tela do Dashboard sem depender do backend real.
-  const projetos = db.apontamentos.length;
+  const totalApontamentos = db.apontamentos.length;
+  const projetosComApontamento = new Set(db.apontamentos.map((a) => a.projeto_id)).size;
   return {
     resumo:
       '[Resumo simulado — mock-server.js não chama o Gemini de verdade] ' +
-      `Há ${projetos} apontamento(s) registrado(s) neste servidor local. No backend real, aqui apareceria um resumo ` +
+      `Há ${totalApontamentos} apontamento(s) registrado(s) neste servidor local. No backend real, aqui apareceria um resumo ` +
       'em texto gerado pela IA sobre como as horas estão distribuídas entre os projetos.',
-    projetos: 0,
+    projetos: projetosComApontamento,
   };
 }
 
