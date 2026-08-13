@@ -1,0 +1,1300 @@
+/* ==========================================================================
+   Dashboard Admin — styles.css
+   Mesma linguagem visual do app de campo (Timesheet).
+   ========================================================================== */
+
+:root {
+  --color-primary: #1f6f54;
+  --color-primary-dark: #16503d;
+  --color-primary-light: #e6f2ee;
+  --color-danger: #b3441e;
+  --color-danger-light: #fbeae3;
+  --color-warning: #8a6d1a;
+  --color-warning-light: #fdf3d9;
+  --color-success: #1f6f54;
+  --color-text: #1e2422;
+  --color-text-muted: #5c6863;
+  --color-border: #d9e0dc;
+  --color-bg: #f4f6f5;
+  --color-surface: #ffffff;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  --shadow-card: 0 1px 3px rgba(20, 30, 26, 0.08), 0 1px 2px rgba(20, 30, 26, 0.06);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* Paleta categórica (validada para daltonismo) para as 6 atividades fixas do
+     app de campo, sempre na mesma ordem — cor identifica a atividade, nunca a
+     posição/ranking. */
+  --activity-1: #2a78d6;
+  --activity-2: #eb6834;
+  --activity-3: #1baf7a;
+  --activity-4: #eda100;
+  --activity-5: #e87ba4;
+  --activity-6: #008300;
+
+  /* Rampa sequencial (mesmo azul do slot 1) para o mapa de calor — mais
+     escuro = mais horas. */
+  --heat-min: #cde2fb;
+  --heat-max: #0d366b;
+
+  /* Status semântico (conformidade de apontamento) — paleta fixa, nunca
+     reaproveitada para outra coisa, sempre acompanhada de ícone + texto. */
+  --status-good: #0ca30c;
+  --status-good-bg: #e3f7e3;
+  --status-warning: #8a6d1a;
+  --status-warning-bg: #fdf0d9;
+  --status-critical: #b3271f;
+  --status-critical-bg: #fbe3e3;
+
+  /* Verde neon — só pra realces pontuais (foco, glow de estado ativo),
+     nunca como cor de texto/preenchimento de área grande. */
+  --color-neon: #39ff8f;
+  --glow-neon: 0 0 0 3px rgba(57, 255, 143, 0.22);
+
+  /* Neutro deliberadamente fora da paleta de status — é uma referência de
+     capacidade (aba Equipe), não um sinal de bom/ruim. */
+  --capacity-bar: #aab8c2;
+  --capacity-bar-border: #8a9aa5;
+
+  /* Segunda cor de linha (contagem de colaboradores/projetos nos gráficos de
+     eixo duplo da aba Equipe) — distinta do verde da marca e do azul do
+     heatmap, pra não confundir com nenhum dos dois vocabulários já em uso. */
+  --count-line: #6b4fa0;
+
+  /* Faixas de fundo do gráfico de horas por dia — neutras, não fazem parte da
+     paleta de status (0h num fim de semana/feriado não é problema). */
+  --weekend-band: #eef1f0;
+  --holiday-band: #f3ecd6;
+
+  --transition-fast: 120ms ease;
+
+  font-size: 16px;
+}
+
+:root[data-theme="dark"] {
+  --color-primary: #2fa17c;
+  --color-primary-dark: #7fe0bd;
+  --color-primary-light: #163a2f;
+  --color-danger: #e0714a;
+  --color-danger-light: #3d241c;
+  --color-warning: #d9a83a;
+  --color-warning-light: #3a3016;
+  --color-success: #2fa17c;
+  --color-text: #eef2f0;
+  --color-text-muted: #9fada7;
+  --color-border: #2a332e;
+  --color-bg: #12140f;
+  --color-surface: #1a1e19;
+
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+
+  --status-good: #4ade80;
+  --status-good-bg: #123d24;
+  --status-warning: #e8c15a;
+  --status-warning-bg: #3a3016;
+  --status-critical: #f0796b;
+  --status-critical-bg: #3d1c18;
+
+  --heat-min: #17324f;
+  --heat-max: #62b4ff;
+
+  --capacity-bar: #4a5a63;
+  --capacity-bar-border: #64777f;
+  --count-line: #a48ce0;
+  --weekend-band: #20261f;
+  --holiday-band: #332c17;
+
+  --glow-neon: 0 0 0 3px rgba(57, 255, 143, 0.32);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.45;
+  padding-bottom: var(--space-6);
+  transition: background var(--transition-fast), color var(--transition-fast);
+  position: relative;
+}
+
+h1, h2 { margin: 0; line-height: 1.25; }
+.hidden { display: none !important; }
+.muted { color: var(--color-text-muted); font-size: 0.88rem; }
+
+code {
+  background: var(--color-primary-light);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+
+/* ------------------------------ Header ------------------------------ */
+
+.admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  flex-wrap: wrap;
+}
+
+.admin-header__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.admin-header__logo-empresa { height: 30px; width: auto; display: block; }
+.admin-header__logo-exa { height: 42px; width: auto; display: block; transition: filter var(--transition-fast); }
+
+/* A logo da EXA é em cinza-escuro sobre fundo transparente — inverte pra
+   ficar clara e legível sobre o header escuro do tema dark. */
+:root[data-theme="dark"] .admin-header__logo-exa { filter: invert(1) brightness(1.15); }
+
+.admin-header__divider {
+  width: 1px;
+  height: 28px;
+  background: var(--color-border);
+}
+
+.admin-header h1 { font-size: 1.15rem; color: var(--color-primary-dark); }
+.admin-header__subtitle { margin: 0; font-size: 0.82rem; color: var(--color-text-muted); }
+
+.admin-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.admin-header__session {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.theme-toggle:hover,
+.theme-toggle:focus-visible {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.theme-toggle:focus-visible { outline: none; box-shadow: var(--glow-neon); }
+
+.theme-toggle__icon { width: 18px; height: 18px; }
+.theme-toggle__icon--moon { display: none; }
+:root[data-theme="dark"] .theme-toggle__icon--sun { display: none; }
+:root[data-theme="dark"] .theme-toggle__icon--moon { display: block; }
+
+/* ------------------------------ Marca d'água ------------------------------ */
+
+.watermark {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.watermark::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: -4%;
+  width: min(46vw, 560px);
+  aspect-ratio: 713 / 636;
+  transform: translateY(-50%);
+  background: var(--color-primary);
+  opacity: 0.05;
+  -webkit-mask-image: url('../assets/Agricef - Logo Folha.png');
+  mask-image: url('../assets/Agricef - Logo Folha.png');
+  -webkit-mask-mode: luminance;
+  mask-mode: luminance;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  mask-position: center;
+  transition: background var(--transition-fast);
+}
+
+:root[data-theme="dark"] .watermark::after {
+  opacity: 0.06;
+  background: var(--color-neon);
+}
+
+/* ------------------------------- Main -------------------------------- */
+
+.admin-main {
+  padding: var(--space-4);
+  max-width: 1000px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-5);
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.card h2 {
+  font-size: 1.05rem;
+  color: var(--color-primary-dark);
+}
+
+/* ------------------------------- Toasts ------------------------------- */
+
+.toast-area {
+  position: fixed;
+  top: var(--space-4);
+  right: var(--space-4);
+  left: var(--space-4);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  pointer-events: none;
+}
+
+.toast {
+  margin-left: auto;
+  max-width: 360px;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: 0.88rem;
+  box-shadow: var(--shadow-card);
+  animation: toast-in 0.15s ease-out;
+}
+
+.toast--success { background: var(--color-primary); color: #fff; }
+.toast--error { background: var(--color-danger); color: #fff; }
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* --------------------------- Auth (config/login) ------------------------ */
+
+.auth-card {
+  max-width: 420px;
+  margin: var(--space-6) auto 0;
+}
+
+.stacked-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.config-test-result {
+  margin-top: var(--space-3);
+  font-size: 0.85rem;
+}
+
+.config-test-result.ok { color: var(--color-primary-dark); }
+.config-test-result.error { color: var(--color-danger); }
+
+/* -------------------------------- Forms -------------------------------- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.field label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.field--checkbox label {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 500;
+}
+
+select, input[type="text"], input[type="email"], input[type="password"], input[type="url"],
+input[type="number"], input[type="date"], input[type="month"] {
+  font: inherit;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  width: 100%;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+select:focus-visible, input:focus-visible, textarea:focus-visible {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: var(--glow-neon);
+}
+
+.btn {
+  font: inherit;
+  font-weight: 600;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-md);
+  border: none;
+  cursor: pointer;
+}
+
+.btn--start { background: var(--color-primary); color: #fff; transition: filter var(--transition-fast), box-shadow var(--transition-fast); }
+.btn--start:hover { filter: brightness(0.9); }
+.btn--start:focus-visible { outline: none; box-shadow: var(--glow-neon); }
+
+.btn--ghost {
+  background: transparent;
+  color: var(--color-primary-dark);
+  border: 1px solid var(--color-primary);
+}
+
+.btn--danger { background: var(--color-danger); color: #fff; transition: filter var(--transition-fast); }
+.btn--danger:hover { filter: brightness(0.9); }
+.btn--danger:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(179, 68, 30, 0.3); }
+
+.btn--small { padding: var(--space-2) var(--space-3); font-size: 0.85rem; }
+
+.link-button {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  font-size: 0.82rem;
+  cursor: pointer;
+  text-decoration: underline;
+  margin-top: var(--space-3);
+  padding: 0;
+}
+
+/* --------------------------------- Tabs --------------------------------- */
+
+.tabs-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.tabs {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  flex-wrap: wrap;
+}
+
+/* ---------------------- Exportação em PDF (impressão) ---------------------- */
+
+.print-report-header { display: none; }
+
+@media print {
+  .no-print,
+  .admin-header__session,
+  .tabs-bar > .tabs,
+  .watermark,
+  .theme-toggle,
+  form,
+  .panel-header__controls,
+  .row-actions,
+  .chart-zoom-controls {
+    display: none !important;
+  }
+
+  #chartHorasDiariasStatus, #chartHorasDiariasAtividade {
+    width: 820px !important;
+  }
+
+  /* Força o visual claro no PDF mesmo que o dashboard esteja no tema escuro. */
+  :root, :root[data-theme="dark"] {
+    --color-primary: #1f6f54;
+    --color-primary-dark: #16503d;
+    --color-primary-light: #e6f2ee;
+    --color-text: #1e2422;
+    --color-text-muted: #5c6863;
+    --color-border: #d9e0dc;
+    --color-bg: #ffffff;
+    --color-surface: #ffffff;
+    --status-good: #0ca30c;
+    --status-good-bg: #e3f7e3;
+    --status-warning: #8a6d1a;
+    --status-warning-bg: #fdf0d9;
+    --status-critical: #b3271f;
+    --status-critical-bg: #fbe3e3;
+    --capacity-bar: #aab8c2;
+    --capacity-bar-border: #8a9aa5;
+    --count-line: #6b4fa0;
+    --weekend-band: #eef1f0;
+    --holiday-band: #f3ecd6;
+  }
+
+  .admin-header__logo-exa { filter: none !important; }
+
+  body { padding-bottom: 0; }
+  .admin-main { max-width: 100%; padding: 0; }
+  .card { box-shadow: none; border: 1px solid var(--color-border); break-inside: avoid; }
+  .tab-panel.hidden { display: none !important; }
+  .tab-panel:not(.hidden) { display: block !important; }
+  /* Uma aba por folha no PDF — todo painel incluído no relatório, exceto o
+     primeiro, começa numa página nova. */
+  .tab-panel:not(.hidden) ~ .tab-panel:not(.hidden) {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  .print-report-header {
+    display: block;
+    margin-bottom: var(--space-4);
+    padding-bottom: var(--space-3);
+    border-bottom: 2px solid var(--color-primary);
+  }
+
+  .print-report-header__title {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--color-primary-dark);
+  }
+
+  .print-report-header__meta {
+    margin: var(--space-1) 0 0;
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+  }
+}
+
+.tab-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font: inherit;
+  font-weight: 600;
+  padding: var(--space-2) var(--space-4);
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.tab-icon { width: 16px; height: 16px; flex-shrink: 0; }
+
+.tab-button {
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.tab-button.is-active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+  box-shadow: 0 0 10px rgba(57, 255, 143, 0.28);
+}
+
+.tab-button:focus-visible {
+  outline: none;
+  box-shadow: var(--glow-neon);
+}
+
+/* ------------------------------ Panel/forms ------------------------------ */
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.panel-header h2 { margin: 0; }
+
+.panel-header__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.panel-header__controls select {
+  width: auto;
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.85rem;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.section-subheading {
+  margin: var(--space-5) 0 var(--space-2);
+  font-size: 0.95rem;
+  color: var(--color-primary-dark);
+}
+.section-subheading:first-of-type { margin-top: 0; }
+
+.inline-form {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+  background: var(--color-primary-light);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+}
+
+.inline-form__actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* -------------------------------- Tables --------------------------------- */
+
+.table-wrapper { overflow-x: auto; }
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  min-width: 480px;
+}
+
+.data-table th, .data-table td {
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+
+.data-table th {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.status-pill {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 999px;
+}
+
+.status-pill--active { background: var(--color-primary-light); color: var(--color-primary-dark); }
+.status-pill--inactive { background: var(--color-danger-light); color: var(--color-danger); }
+
+.role-pill {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--color-warning-light);
+  color: var(--color-warning);
+}
+
+/* Status semântico (conformidade de apontamento) — paleta fixa, nunca reaproveitada
+   para outra coisa, sempre acompanhada de ícone + texto (nunca só a cor). */
+.status-pill--good { background: var(--status-good-bg); color: var(--status-good); }
+.status-pill--warning { background: var(--status-warning-bg); color: var(--status-warning); }
+.status-pill--critical { background: var(--status-critical-bg); color: var(--status-critical); }
+
+.row-actions { display: flex; gap: var(--space-2); }
+
+.row-actions button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--color-primary-dark);
+  text-decoration: underline;
+  padding: 0;
+}
+
+.empty-state {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  text-align: center;
+  padding: var(--space-4);
+}
+
+.admin-footer {
+  max-width: 1000px;
+  margin: var(--space-4) auto 0;
+  padding: var(--space-4) var(--space-4) var(--space-5);
+  border-top: 1px solid var(--color-border);
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.admin-footer p { margin: 0 0 var(--space-1); }
+.admin-footer p:last-child { margin-bottom: 0; }
+
+.admin-footer__title {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--color-primary-dark);
+}
+
+.admin-footer__notice {
+  font-style: italic;
+}
+
+.admin-footer__tech {
+  margin-top: var(--space-2) !important;
+  opacity: 0.75;
+}
+
+/* ---------------------- Filtro de horas ---------------------- */
+
+.horas-filtro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+}
+
+.horas-filtro .field { flex: 1 1 160px; min-width: 140px; }
+
+.horas-filtro select,
+.horas-filtro input[type="date"] {
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.85rem;
+}
+
+/* ---------------------- Gráfico de pizza do departamento ---------------------- */
+
+.departamento-chart-container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+.departamento-chart__svg-wrap { flex: 0 0 auto; }
+
+.departamento-chart__legend {
+  flex: 1 1 240px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.departamento-chart__legend-row {
+  display: grid;
+  grid-template-columns: 12px 1fr auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.85rem;
+}
+
+.departamento-chart__legend-row i {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.departamento-chart__legend-name { color: var(--color-text); }
+
+.departamento-chart__legend-pct {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-primary-dark);
+  min-width: 3.2em;
+  text-align: right;
+}
+
+.departamento-chart__legend-hours {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 4.5em;
+  text-align: right;
+}
+
+.departamento-chart__slice { transition: opacity 0.1s ease; }
+.departamento-chart__slice:hover { opacity: 0.85; }
+
+/* ---------------------- Resumo por IA ---------------------- */
+
+.resumo-ia {
+  margin-top: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-primary-light);
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.resumo-ia.loading {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.resumo-ia.error {
+  background: var(--color-danger-light);
+  color: var(--color-danger);
+  font-style: normal;
+}
+
+/* ---------------------- Mapa de calor ---------------------- */
+
+.heatmap-wrap { overflow-x: auto; }
+
+table.heatmap {
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  min-width: 480px;
+}
+
+table.heatmap th, table.heatmap td {
+  padding: 6px 8px;
+  text-align: center;
+  border: 1px solid var(--color-surface);
+}
+
+table.heatmap thead th {
+  color: var(--color-text-muted);
+  font-weight: 600;
+  font-size: 0.72rem;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  height: 90px;
+  vertical-align: bottom;
+  padding-bottom: var(--space-2);
+  border: none;
+}
+
+table.heatmap tbody th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  padding-right: var(--space-3);
+  border: none;
+  font-size: 0.78rem;
+}
+table.heatmap tbody th span {
+  display: block;
+  font-weight: 400;
+  color: var(--color-text-muted);
+  font-size: 0.7rem;
+}
+
+table.heatmap td.cell {
+  border-radius: 4px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  min-width: 46px;
+}
+table.heatmap td.cell.empty {
+  background: var(--color-bg);
+  color: var(--color-border);
+  font-weight: 400;
+}
+
+.heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+.heatmap-legend .ramp {
+  width: 160px;
+  height: 10px;
+  border-radius: 5px;
+  background: linear-gradient(90deg, var(--heat-min), var(--heat-max));
+}
+
+/* ---------------------- Gráfico de horas por atividade ---------------------- */
+
+.horas-chart-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.horas-chart__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.horas-chart__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.horas-chart__legend-item i {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.horas-chart__rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.horas-chart__row {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.horas-chart__label {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.horas-chart__name {
+  font-weight: 600;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.horas-chart__total {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.horas-chart__track {
+  display: flex;
+  height: 24px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+}
+
+.horas-chart__segment {
+  position: relative;
+  min-width: 3px;
+  border-right: 2px solid var(--color-surface);
+  transition: opacity 0.1s ease;
+}
+.horas-chart__segment:last-child { border-right: none; }
+.horas-chart__segment:hover { opacity: 0.85; }
+
+.horas-chart__segment-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+@media (min-width: 640px) {
+  .inline-form { grid-template-columns: 1fr 1fr; }
+  .inline-form__actions { grid-column: 1 / -1; }
+}
+
+/* ---------------------- Aba Equipe — KPIs e capacidade ---------------------- */
+
+.teto-control {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+.teto-control label { font-weight: 600; }
+.teto-control input {
+  width: 60px;
+  padding: var(--space-2);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-3);
+}
+@media (max-width: 760px) {
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.kpi {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+.kpi__label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+.kpi__value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+.kpi__value.accent { color: var(--color-primary-dark); }
+.kpi__sub { font-size: 0.76rem; color: var(--color-text-muted); }
+.kpi--warn .kpi__value { color: var(--status-warning); }
+
+/* ---------------------- Aba Equipe — gráficos mensais (SVG) ---------------------- */
+
+.chart-wrap { overflow-x: auto; }
+.chart-wrap svg { display: block; }
+
+.month-tick { font-size: 11px; fill: var(--color-text-muted); }
+.value-tick { font-size: 10px; fill: var(--color-text-muted); }
+.gridline { stroke: var(--color-border); stroke-width: 1; }
+
+.bar-consumido { cursor: default; }
+.bar-consumido:hover { opacity: 0.85; }
+
+.pct-line { fill: none; stroke: var(--color-primary-dark); stroke-width: 2; }
+.pct-dot { stroke: var(--color-surface); stroke-width: 2; }
+.ref-line { stroke-width: 1; stroke-dasharray: 3 3; }
+.ref-label { font-size: 9px; }
+
+.hours-bar { fill: var(--color-primary); }
+.hours-bar:hover { opacity: 0.85; }
+.count-line { fill: none; stroke: var(--count-line); stroke-width: 2; }
+.count-dot { fill: var(--color-surface); stroke: var(--count-line); stroke-width: 2; }
+
+.legend-row {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  margin-top: var(--space-3);
+  align-items: center;
+}
+.legend-row span { display: inline-flex; align-items: center; gap: 6px; }
+.legend-row i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.legend-row i.line { width: 16px; height: 0; border-top: 2px dashed currentColor; border-radius: 0; }
+.legend-row i.solidline { width: 16px; height: 0; border-top: 2px solid var(--color-primary-dark); border-radius: 0; }
+
+/* ---------------------- Zona de risco (exclusão de apontamentos) ---------------------- */
+
+.danger-zone {
+  border: 1px solid var(--color-danger);
+  background: var(--color-danger-light);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+}
+.danger-zone__fields { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-3); }
+.danger-zone__fields .field { flex: 0 1 160px; }
+
+/* ---------------------- Divisão visual por tema (Apontamentos) ---------------------- */
+
+/* Cada bloco temático da aba Apontamentos (Ranking, Horas por dia,
+   Conformidade, etc.) fica dentro de um contorno próprio, com seu filtro no
+   cabeçalho — deixa claro que cada controle só afeta o conteúdo ao lado dele,
+   não a aba inteira. */
+.apontamentos-secao {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4) var(--space-5);
+  margin-top: var(--space-5);
+}
+.apontamentos-secao > .panel-header,
+.apontamentos-secao > .section-subheading:first-child {
+  margin-top: 0;
+}
+.apontamentos-secao--perigo {
+  border-color: var(--color-danger);
+}
+
+/* ---------------------- Horas apontadas por dia (Apontamentos) ---------------------- */
+
+.horas-diarias-filtro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-3);
+}
+.horas-diarias-filtro .field { flex: 1 1 180px; min-width: 160px; }
+.horas-diarias-filtro select { padding: var(--space-2) var(--space-3); font-size: 0.85rem; }
+
+.chart-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  margin-left: auto;
+}
+.chart-zoom-controls__label { font-weight: 600; }
+#horasDiariasZoomLevel { min-width: 3.2em; text-align: center; font-variant-numeric: tabular-nums; }
+
+.chart-zoom-btn {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.chart-zoom-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.chart-zoom-btn:disabled { opacity: 0.4; cursor: default; }
+.chart-zoom-btn:disabled:hover { border-color: var(--color-border); color: var(--color-text); }
+
+#chartHorasDiariasStatus, #chartHorasDiariasAtividade { width: 820px; }
+
+.weekend-band { fill: var(--weekend-band); }
+.holiday-band { fill: var(--holiday-band); }
+.day-tick { font-size: 9.5px; fill: var(--color-text-muted); }
+.meta-line { stroke: var(--color-text); stroke-width: 1.5; stroke-dasharray: 4 3; opacity: 0.6; }
+.day-bar { cursor: default; }
+.day-bar:hover { opacity: 0.8; }
+
+/* Colunas curtas (meses) não precisam do cabeçalho vertical pensado pra
+   nomes longos de colaborador — mantém horizontal aqui. */
+table.heatmap.heatmap--months thead th {
+  writing-mode: horizontal-tb;
+  transform: none;
+  height: auto;
+  padding-bottom: 6px;
+  vertical-align: middle;
+}
+
+/* ============================== Aba Financeira ============================== */
+
+.chart-footnote { margin-top: var(--space-2); font-size: 0.8rem; color: var(--color-text-muted); font-style: italic; }
+
+.kpi__value.pos { color: var(--status-good); }
+.kpi__value.neg { color: var(--status-critical); }
+
+/* ---- custo x receita mensal ---- */
+.cost-bar { fill: var(--color-primary); cursor: default; }
+.cost-bar:hover { opacity: 0.85; }
+.revenue-bar { fill: var(--activity-3); cursor: default; }
+.revenue-bar:hover { opacity: 0.85; }
+.cost-line { fill: none; stroke: var(--color-text); stroke-width: 2; }
+.cost-dot { fill: var(--color-surface); stroke: var(--color-text); stroke-width: 2; }
+.revenue-avg-line { stroke: var(--activity-1); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.revenue-avg-label { font-size: 10px; fill: var(--activity-1); font-weight: 600; }
+
+/* ---- margem por projeto (barra divergente) ---- */
+.margem-rows { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-3); }
+.margem-row { display: grid; grid-template-columns: 190px 1fr 110px; align-items: center; gap: var(--space-3); font-size: 0.85rem; }
+@media (max-width: 640px) { .margem-row { grid-template-columns: 1fr; gap: var(--space-1); } }
+.margem-row__nome { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.margem-row__track { position: relative; height: 22px; background: var(--color-bg); border-radius: 4px; overflow: hidden; }
+.margem-row__axis { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--color-border); }
+.margem-row__bar { position: absolute; top: 2px; bottom: 2px; border-radius: 3px; }
+.margem-row__valor { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
+.margem-row__valor.pos { color: var(--status-good); }
+.margem-row__valor.neg { color: var(--status-critical); }
+
+/* ---- % do orçamento consumido ---- */
+.orcamento-rows { display: flex; flex-direction: column; gap: var(--space-3); margin-top: var(--space-3); }
+.orcamento-row__label { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 4px; }
+.orcamento-row__name { font-weight: 600; }
+.orcamento-row__pct { font-variant-numeric: tabular-nums; font-weight: 700; }
+.orcamento-row__track { height: 14px; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: 999px; overflow: hidden; }
+.orcamento-row__fill { height: 100%; border-radius: 999px 0 0 999px; }
+
+/* ---- projeção de custo por projeto ---- */
+.projecao-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3); }
+.projecao-legend { display: flex; flex-wrap: wrap; gap: var(--space-2); flex: 1 1 auto; }
+.projecao-chip {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; font-weight: 600;
+  padding: 4px 10px 4px 8px; border-radius: 999px; border: 1px solid var(--color-border);
+  background: var(--color-surface); color: var(--color-text); cursor: pointer; user-select: none;
+}
+.projecao-chip i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.projecao-chip.is-off { opacity: 0.4; text-decoration: line-through; }
+
+.proj-diag { stroke: var(--color-border); stroke-width: 1.5; stroke-dasharray: 2 3; }
+.proj-limit { stroke: var(--status-critical); stroke-width: 1; stroke-dasharray: 4 3; opacity: 0.6; }
+.proj-line { fill: none; stroke-width: 2.5; }
+.proj-line--projetado { stroke-dasharray: 5 4; opacity: 0.75; }
+.proj-dot { stroke: var(--color-surface); stroke-width: 2; }
+
+/* ---- bolhas de desvio custo x prazo ---- */
+.quad-good { fill: var(--status-good-bg); }
+.quad-warn { fill: var(--status-warning-bg); }
+.quad-bad { fill: var(--status-critical-bg); }
+.quad-axis { stroke: var(--color-text-muted); stroke-width: 1; stroke-dasharray: 4 3; opacity: 0.7; }
+.axis-title { font-size: 10.5px; fill: var(--color-text-muted); font-weight: 600; }
+.bubble { stroke: var(--color-surface); stroke-width: 1.5; cursor: default; }
+.bubble:hover { opacity: 0.85; }
+.bubble-label { font-size: 10px; fill: var(--color-text); font-weight: 700; }
+.bubble-sub { font-size: 9px; fill: var(--color-text-muted); }
+.media-marker { fill: none; stroke: var(--status-critical); stroke-width: 2; }
+.media-label { font-size: 10px; fill: var(--status-critical); font-weight: 700; }
+
+#chartFinanceiraProjecao { width: 780px; }
+#chartFinanceiraBolhas { width: 720px; }
+
+/* ============================== Aba Estratégia ============================== */
+
+.field-note {
+  background: var(--color-primary-light);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  font-size: 0.85rem;
+  color: var(--color-primary-dark);
+  margin-bottom: var(--space-4);
+}
+.deferred-note {
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  margin-top: var(--space-4);
+}
+
+.kpi__sub.pos { color: var(--status-good); font-weight: 600; }
+.kpi__sub.neg { color: var(--status-critical); font-weight: 600; }
+
+/* ---- horas/custo por cargo, atual x cenário (barras agrupadas) ---- */
+.bar-atual { fill: var(--capacity-bar); stroke: var(--capacity-bar-border); }
+.bar-cenario { fill: var(--count-line); }
+
+/* ---- elenco do cenário ---- */
+.elenco-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.elenco-table th,
+.elenco-table td { text-align: left; padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-border); }
+.elenco-table th { color: var(--color-text-muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.elenco-status { display: inline-block; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.elenco-status--mantido { background: var(--color-bg); color: var(--color-text-muted); }
+.elenco-status--novo { background: var(--status-good-bg); color: var(--status-good); }
+.elenco-status--removido { background: var(--status-critical-bg); color: var(--status-critical); text-decoration: line-through; }
+.elenco-row--removido td:not(.elenco-status-cell) { opacity: 0.5; text-decoration: line-through; }
+
+/* ============================== Ranking da equipe (Apontamentos) ============================== */
+
+.ranking-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-5); margin-top: var(--space-3); }
+@media (max-width: 700px) { .ranking-grid { grid-template-columns: 1fr; } }
+.ranking-card h4 { font-size: 0.85rem; color: var(--color-text); margin: 0 0 var(--space-2); }
+.ranking-card p.muted { margin: 0 0 var(--space-3); }
+.ranking-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ranking-row { display: flex; align-items: center; gap: var(--space-2); padding: 6px var(--space-2); border-radius: var(--radius-sm); }
+.ranking-row--top1 { background: var(--color-primary-light); }
+.ranking-row__pos {
+  flex: 0 0 auto; min-width: 20px; height: 20px; padding: 0 4px; border-radius: 999px;
+  background: var(--color-bg); border: 1px solid var(--color-border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.7rem; font-weight: 700; color: var(--color-text-muted);
+}
+.ranking-row--top1 .ranking-row__pos { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+.ranking-row__nome { flex: 1 1 auto; font-size: 0.86rem; font-weight: 600; }
+.ranking-row__valor { flex: 0 0 auto; font-size: 0.82rem; color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+.ranking-row__delta {
+  flex: 0 0 auto; font-size: 0.74rem; font-weight: 600; font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted); margin-left: auto; padding-left: var(--space-2);
+}
+.ranking-row__delta--up { color: var(--status-good); }
+.ranking-row__delta--down { color: var(--status-critical); }
+.ranking-row__delta--novo { color: var(--color-primary-dark); font-style: italic; font-weight: 400; }
+.ranking-empty { font-size: 0.85rem; color: var(--color-text-muted); font-style: italic; }
+.badge-full {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 600;
+  background: var(--status-good-bg); color: var(--status-good); padding: 4px 10px; border-radius: 999px;
+}
+
+/* ============================== Aba Relatório (individual) ============================== */
+
+.resumo-box {
+  background: var(--color-primary-light); border-radius: var(--radius-md); padding: var(--space-4);
+  font-size: 0.92rem; color: var(--color-primary-dark); margin: var(--space-4) 0;
+}
+.resumo-box.is-ok { background: var(--status-good-bg); color: var(--status-good); }
+
+.atividade-split { display: flex; gap: var(--space-5); flex-wrap: wrap; align-items: flex-start; margin-top: var(--space-3); }
+.atividade-split__svg { flex: 0 0 auto; }
+.atividade-table { flex: 1 1 280px; width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.atividade-table th, .atividade-table td { text-align: left; padding: 6px var(--space-2); border-bottom: 1px solid var(--color-border); }
+.atividade-table th { color: var(--color-text-muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.atividade-table td:not(:first-child), .atividade-table th:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+.atividade-table__nome { display: flex; align-items: center; gap: 8px; }
+.atividade-table__nome i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex: 0 0 auto; }

@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Timesheet — Dashboard Admin</title>
+  <link rel="stylesheet" href="css/styles.css" />
+  <script>
+    // Aplica o tema salvo antes do primeiro paint, pra não piscar claro→escuro.
+    (function () {
+      var saved = localStorage.getItem('timesheet_admin_theme');
+      if (saved === 'dark' || saved === 'light') {
+        document.documentElement.setAttribute('data-theme', saved);
+      }
+    })();
+  </script>
+</head>
+<body>
+
+  <div class="watermark" aria-hidden="true"></div>
+
+  <header class="admin-header">
+    <div class="admin-header__brand">
+      <img class="admin-header__logo-empresa" src="assets/Agricef - Logo Empresa.png" alt="Agricef" />
+      <span class="admin-header__divider" aria-hidden="true"></span>
+      <img class="admin-header__logo-exa" src="assets/Agricef - .png" alt="EXA — Experimentação Agrícola" />
+      <div>
+        <h1>Gestão de Pessoas</h1>
+        <p class="admin-header__subtitle">Clientes, projetos, colaboradores e apontamentos</p>
+      </div>
+    </div>
+    <div class="admin-header__actions">
+      <button type="button" id="themeToggleButton" class="theme-toggle" aria-label="Alternar tema claro/escuro" title="Alternar tema claro/escuro">
+        <svg class="theme-toggle__icon theme-toggle__icon--sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+          <circle cx="12" cy="12" r="4.2" />
+          <path d="M12 2.5v2.4M12 19.1v2.4M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.6 19.4l1.7-1.7M17.7 6.3l1.7-1.7" stroke-linecap="round" />
+        </svg>
+        <svg class="theme-toggle__icon theme-toggle__icon--moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+          <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.8 6.8 0 0 0 10.5 10.5Z" stroke-linejoin="round" />
+        </svg>
+      </button>
+      <div id="sessionInfo" class="admin-header__session hidden">
+        <span id="sessionUserName"></span>
+        <button id="logoutButton" class="btn btn--ghost btn--small">Sair</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="admin-main">
+
+    <div id="toastArea" class="toast-area" aria-live="assertive"></div>
+
+    <!-- ------------------------- Tela de configuração da API ------------------------- -->
+    <section id="configScreen" class="card auth-card hidden">
+      <h2>Conectar ao backend</h2>
+      <p class="muted">
+        Cole aqui a URL do Google Apps Script (Web App) publicada seguindo o guia
+        <code>backend/SETUP.md</code>. Ela termina em <code>/exec</code>.
+      </p>
+      <form id="configForm" class="stacked-form">
+        <div class="field">
+          <label for="apiUrlInput">URL da API</label>
+          <input type="url" id="apiUrlInput" placeholder="https://script.google.com/macros/s/XXXX/exec" required />
+        </div>
+        <button type="submit" class="btn btn--start">Salvar e continuar</button>
+      </form>
+      <p id="configTestResult" class="config-test-result"></p>
+    </section>
+
+    <!-- ------------------------------- Tela de login ------------------------------- -->
+    <section id="loginScreen" class="card auth-card hidden">
+      <h2>Entrar</h2>
+      <p class="muted">Acesso restrito a colaboradores com perfil administrador.</p>
+      <form id="loginForm" class="stacked-form">
+        <div class="field">
+          <label for="loginEmail">E-mail</label>
+          <input type="email" id="loginEmail" required autocomplete="username" />
+        </div>
+        <div class="field">
+          <label for="loginPassword">Senha</label>
+          <input type="password" id="loginPassword" required autocomplete="current-password" />
+        </div>
+        <button type="submit" class="btn btn--start">Entrar</button>
+      </form>
+      <button id="changeApiUrlButton" class="link-button">Trocar URL da API</button>
+    </section>
+
+    <!-- ------------------------------ Dashboard ------------------------------ -->
+    <section id="dashboardScreen" class="hidden">
+
+      <div class="tabs-bar">
+        <nav class="tabs" role="tablist">
+          <button class="tab-button is-active" data-tab="clientes" role="tab">
+            <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 20V6.8c0-.8.6-1.5 1.4-1.7l6-1.5a1.7 1.7 0 0 1 2.2 1.6V20M4 20h16M9 20v-4.2c0-.5.4-.8.8-.8h1.4c.4 0 .8.3.8.8V20M14 20V9.5c0-.5.4-.9.9-.9h3.2c.5 0 .9.4.9.9V20" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            Clientes
+          </button>
+          <button class="tab-button" data-tab="projetos" role="tab">
+            <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 5.5c0-.6.4-1 1-1h4l1.6 2h8.4c.6 0 1 .4 1 1v10.9c0 .6-.4 1-1 1H5c-.6 0-1-.4-1-1V5.5Z" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            Projetos
+          </button>
+          <button class="tab-button" data-tab="colaboradores" role="tab">
+            <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="9" cy="8" r="3.2" /><path d="M3.5 19c.6-3.2 3-5 5.5-5s4.9 1.8 5.5 5M15.5 6.8a3 3 0 0 1 0 5.9M18 13.6c2.1.4 3.7 2 4.2 4.9" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            Colaboradores
+          </button>
+          <button class="tab-button" data-tab="apontamentos" role="tab">
+            <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            Apontamentos
+          </button>
+          <button class="tab-button" data-tab="equipe" role="tab">
+            <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 20c.5-3.4 3-5.3 5.5-5.3S13.5 16.6 14 20M8.5 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM14.5 9.5c1.6.3 2.8 1.7 3.1 3.6M15 6.3a2.4 2.4 0 1 1 0 4.7" stroke-linecap="round" stroke-linejoin="round" /><path d="M14.5 20c.4-2.8 2-4.3 4-4.3s3.4 1.4 4 3.9" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            Equipe
+          </button>
+          <button class="tab-button" data-tab="financeira" role="tab" id="financeiraTabButton">
+            <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 3.5v17M16.5 6.8c0-1.5-1.6-2.6-4-2.6-2.7 0-4.5 1.3-4.5 3.1 0 4 8.5 1.9 8.5 5.9 0 1.9-1.9 3.2-4.5 3.2-2.4 0-4-1-4-2.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            Financeira
+          </button>
+          <button class="tab-button" data-tab="estrategia" role="tab" id="estrategiaTabButton">
+            <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="0.9" fill="currentColor" stroke="none" /></svg>
+            Estratégia
+          </button>
+        </nav>
+        <button type="button" class="btn btn--ghost btn--small no-print" id="exportPdfButton">Exportar PDF</button>
+      </div>
+
+      <!-- Só aparece na impressão/exportação em PDF — ver Dashboard.exportReportPdf() em js/app.js -->
+      <div id="printReportHeader" class="print-report-header">
+        <p class="print-report-header__title">Gestão de Pessoas — Agricef, Experimentação Agrícola</p>
+        <p id="printReportHeaderMeta" class="print-report-header__meta"></p>
+      </div>
+
+      <!-- ---------------- Clientes ---------------- -->
+      <section id="tab-clientes" class="tab-panel card">
+        <div class="panel-header">
+          <h2>Clientes</h2>
+          <button class="btn btn--start btn--small" id="newClienteButton">+ Novo cliente</button>
+        </div>
+
+        <form id="clienteForm" class="inline-form hidden">
+          <input type="hidden" id="clienteId" />
+          <div class="field">
+            <label for="clienteNome">Nome do cliente</label>
+            <input type="text" id="clienteNome" required />
+          </div>
+          <div class="field field--checkbox">
+            <label><input type="checkbox" id="clienteAtivo" checked /> Ativo</label>
+          </div>
+          <div class="inline-form__actions">
+            <button type="submit" class="btn btn--start btn--small">Salvar</button>
+            <button type="button" class="btn btn--ghost btn--small" id="cancelClienteButton">Cancelar</button>
+          </div>
+        </form>
+
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr><th>Nome</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody id="clientesTableBody"></tbody>
+          </table>
+          <p id="clientesEmptyState" class="empty-state hidden">Nenhum cliente cadastrado ainda.</p>
+        </div>
+      </section>
+
+      <!-- ---------------- Projetos ---------------- -->
+      <section id="tab-projetos" class="tab-panel card hidden">
+        <div class="panel-header">
+          <h2>Projetos</h2>
+          <button class="btn btn--start btn--small" id="newProjetoButton">+ Novo projeto</button>
+        </div>
+
+        <form id="projetoForm" class="inline-form hidden">
+          <input type="hidden" id="projetoId" />
+          <div class="field">
+            <label for="projetoCliente">Cliente</label>
+            <select id="projetoCliente" required></select>
+          </div>
+          <div class="field">
+            <label for="projetoNome">Nome do projeto</label>
+            <input type="text" id="projetoNome" required />
+          </div>
+          <div class="field">
+            <label for="projetoValorOrcado">Valor orçado (R$)</label>
+            <input type="number" id="projetoValorOrcado" min="0" step="100" placeholder="0 (opcional — deixe 0 para projetos internos)" />
+          </div>
+          <div class="field">
+            <label for="projetoInicioPrevisto">Início previsto</label>
+            <input type="month" id="projetoInicioPrevisto" />
+          </div>
+          <div class="field">
+            <label for="projetoTerminoPrevisto">Término previsto</label>
+            <input type="month" id="projetoTerminoPrevisto" />
+          </div>
+          <div class="field">
+            <label for="projetoDataConclusao">Data de conclusão</label>
+            <input type="month" id="projetoDataConclusao" />
+          </div>
+          <div class="field field--checkbox">
+            <label><input type="checkbox" id="projetoAtivo" checked /> Ativo</label>
+          </div>
+          <div class="inline-form__actions">
+            <button type="submit" class="btn btn--start btn--small">Salvar</button>
+            <button type="button" class="btn btn--ghost btn--small" id="cancelProjetoButton">Cancelar</button>
+          </div>
+        </form>
+
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr><th>Cliente</th><th>Projeto</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody id="projetosTableBody"></tbody>
+          </table>
+          <p id="projetosEmptyState" class="empty-state hidden">Nenhum projeto cadastrado ainda.</p>
+        </div>
+      </section>
+
+      <!-- ---------------- Colaboradores ---------------- -->
+      <section id="tab-colaboradores" class="tab-panel card hidden">
+        <div class="panel-header">
+          <h2>Colaboradores</h2>
+          <button class="btn btn--start btn--small" id="newColaboradorButton">+ Novo colaborador</button>
+        </div>
+
+        <form id="colaboradorForm" class="inline-form hidden">
+          <input type="hidden" id="colaboradorId" />
+          <div class="field">
+            <label for="colaboradorNome">Nome</label>
+            <input type="text" id="colaboradorNome" required />
+          </div>
+          <div class="field">
+            <label for="colaboradorEmail">E-mail</label>
+            <input type="email" id="colaboradorEmail" required />
+          </div>
+          <div class="field">
+            <label for="colaboradorSenha">Senha</label>
+            <input type="password" id="colaboradorSenha" placeholder="Deixe em branco para manter a atual" />
+          </div>
+          <div class="field">
+            <label for="colaboradorPapel">Perfil</label>
+            <select id="colaboradorPapel">
+              <option value="colaborador">Colaborador</option>
+              <option value="admin">Administrador</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="colaboradorCargo">Cargo</label>
+            <input type="text" id="colaboradorCargo" placeholder="Ex.: Consultor Sênior (opcional)" />
+          </div>
+          <div class="field">
+            <label for="colaboradorDedicacaoDiaria">Dedicação diária (horas)</label>
+            <input type="number" id="colaboradorDedicacaoDiaria" value="8" min="1" max="12" step="0.5" />
+          </div>
+          <div class="field">
+            <label for="colaboradorCustoMensal">Custo mensal (R$)</label>
+            <input type="number" id="colaboradorCustoMensal" min="0" step="100" placeholder="Salário + encargos (opcional)" />
+          </div>
+          <div class="field field--checkbox">
+            <label><input type="checkbox" id="colaboradorAtivo" checked /> Ativo</label>
+          </div>
+          <div class="field field--checkbox">
+            <label><input type="checkbox" id="colaboradorObrigatorioApontamento" checked /> Obrigado a apontar horas</label>
+          </div>
+          <div class="field field--checkbox">
+            <label><input type="checkbox" id="colaboradorAcessoFinanceiro" /> Acesso à aba Financeira</label>
+          </div>
+          <div class="inline-form__actions">
+            <button type="submit" class="btn btn--start btn--small">Salvar</button>
+            <button type="button" class="btn btn--ghost btn--small" id="cancelColaboradorButton">Cancelar</button>
+          </div>
+        </form>
+
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr><th>Nome</th><th>E-mail</th><th>Cargo</th><th>Perfil</th><th>Apontamento</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody id="colaboradoresTableBody"></tbody>
+          </table>
+          <p id="colaboradoresEmptyState" class="empty-state hidden">Nenhum colaborador cadastrado ainda.</p>
+        </div>
+      </section>
+
+      <!-- ---------------- Apontamentos ---------------- -->
+      <section id="tab-apontamentos" class="tab-panel card hidden">
+        <div class="panel-header">
+          <h2>Apontamentos</h2>
+          <div class="panel-header__controls">
+            <button class="btn btn--ghost btn--small" id="refreshApontamentosButton">Atualizar</button>
+          </div>
+        </div>
+
+        <div class="apontamentos-secao">
+          <div class="panel-header">
+            <div>
+              <h3 class="section-subheading" style="margin: 0;">Ranking da equipe</h3>
+              <p class="muted" style="margin-top: 4px;">Comparativo de todos os colaboradores ativos no mês selecionado.</p>
+            </div>
+            <div class="panel-header__controls">
+              <label for="rankingMesSelect" class="visually-hidden">Mês</label>
+              <select id="rankingMesSelect"></select>
+              <label for="rankingComparativoSelect" class="visually-hidden">Comparar com</label>
+              <select id="rankingComparativoSelect">
+                <option value="none">Sem comparativo</option>
+                <option value="1">vs. mês anterior</option>
+                <option value="3">vs. média do trimestre anterior</option>
+                <option value="6">vs. média do semestre anterior</option>
+                <option value="12">vs. média do ano anterior</option>
+              </select>
+            </div>
+          </div>
+          <p id="rankingEquipeEmptyState" class="empty-state hidden">Nenhum apontamento neste mês.</p>
+          <div class="ranking-grid" id="rankingEquipeGrid">
+            <div class="ranking-card">
+              <h4>Quem trabalhou mais</h4>
+              <p class="muted">Total de horas apontadas no mês.</p>
+              <ol class="ranking-list" id="rankMaisHorasList"></ol>
+            </div>
+            <div class="ranking-card">
+              <h4>Quem trabalhou mais, por atividade</h4>
+              <p class="muted">Colaborador com mais horas em cada atividade.</p>
+              <ol class="ranking-list" id="rankPorAtividadeList"></ol>
+            </div>
+            <div class="ranking-card">
+              <h4>Quem apontou todos os dias úteis</h4>
+              <p class="muted" id="rankPresencaTotalDesc">100% de presença no mês (considera só quem é obrigado a apontar).</p>
+              <div id="rankPresencaTotalContainer"></div>
+            </div>
+            <div class="ranking-card">
+              <h4>Quem trabalhou mais fora do horário</h4>
+              <p class="muted">Horas apontadas em finais de semana e feriados.</p>
+              <ol class="ranking-list" id="rankForaHorarioList"></ol>
+            </div>
+          </div>
+        </div>
+
+        <div class="apontamentos-secao">
+          <div class="panel-header">
+            <div>
+              <h3 class="section-subheading" style="margin: 0;">Horas apontadas por dia</h3>
+              <p class="muted" style="margin-top: 4px;">
+                Visão mensal de quantas horas um colaborador apontou, dia a dia — ajuda a ver rápido quem deixou de
+                apontar num dia útil, ou trabalhou muito acima/abaixo do esperado.
+              </p>
+            </div>
+            <div class="panel-header__controls">
+              <label for="horasDiariasColaborador" class="visually-hidden">Colaborador</label>
+              <select id="horasDiariasColaborador"></select>
+              <label for="horasDiariasMes" class="visually-hidden">Mês</label>
+              <select id="horasDiariasMes"></select>
+            </div>
+          </div>
+          <div class="horas-diarias-filtro">
+            <div class="chart-zoom-controls">
+              <span class="chart-zoom-controls__label">Zoom</span>
+              <button type="button" class="chart-zoom-btn" id="horasDiariasZoomOut" aria-label="Diminuir zoom">−</button>
+              <span id="horasDiariasZoomLevel">100%</span>
+              <button type="button" class="chart-zoom-btn" id="horasDiariasZoomIn" aria-label="Aumentar zoom">+</button>
+            </div>
+          </div>
+          <p id="horasDiariasEmptyState" class="empty-state hidden">Nenhum apontamento concluído neste mês para este colaborador.</p>
+
+          <p class="muted"><strong>Situação do dia</strong> — cor conforme as horas apontadas frente à dedicação diária (linha tracejada).</p>
+          <div class="chart-wrap">
+            <svg id="chartHorasDiariasStatus" height="260" viewBox="0 0 820 260" role="img" aria-label="Horas apontadas por dia, coloridas pela situação"></svg>
+          </div>
+          <div class="legend-row">
+            <span><i style="background: var(--status-good)"></i>Na meta ou acima</span>
+            <span><i style="background: var(--status-warning)"></i>Abaixo da meta</span>
+            <span><i style="background: var(--status-critical)"></i>Sem apontamento (dia útil)</span>
+            <span><i style="background: var(--weekend-band); border: 1px solid var(--color-border);"></i>Fim de semana</span>
+            <span><i style="background: var(--holiday-band); border: 1px solid var(--color-border);"></i>Feriado</span>
+            <span><i class="line"></i>Dedicação diária</span>
+          </div>
+
+          <p class="muted" style="margin-top: var(--space-4);"><strong>Composição por atividade</strong> — mesmo eixo, mostrando em que a pessoa trabalhou naquele dia.</p>
+          <div class="chart-wrap">
+            <svg id="chartHorasDiariasAtividade" height="260" viewBox="0 0 820 260" role="img" aria-label="Horas apontadas por dia, por atividade"></svg>
+          </div>
+          <div class="legend-row" id="legendHorasDiariasAtividade"></div>
+        </div>
+
+        <div class="apontamentos-secao">
+          <div class="panel-header">
+            <div>
+              <h3 class="section-subheading" style="margin: 0;">Conformidade de apontamento</h3>
+              <p class="muted" style="margin-top: 4px;">
+                Verificação automática: quem não apontou ou deixou uma atividade em aberto num dia útil recebe um
+                lembrete por e-mail sozinho, todo fim de dia. Fins de semana e feriados (nacionais e de Paulínia/SP)
+                não contam. Este painel mostra a frequência de pendências para você avaliar quando vale um reforço manual.
+              </p>
+            </div>
+            <div class="panel-header__controls">
+              <label for="apontamentosRangeSelect" class="visually-hidden">Período</label>
+              <select id="apontamentosRangeSelect">
+                <option value="15">Últimos 15 dias úteis</option>
+                <option value="30">Últimos 30 dias úteis</option>
+                <option value="60">Últimos 60 dias úteis</option>
+              </select>
+            </div>
+          </div>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Colaborador</th>
+                  <th>Dias sem apontar</th>
+                  <th>Atividades em aberto</th>
+                  <th>Situação</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="conformidadeTableBody"></tbody>
+            </table>
+            <p id="conformidadeEmptyState" class="empty-state hidden">Nenhum colaborador ativo cadastrado ainda.</p>
+          </div>
+        </div>
+
+        <div class="apontamentos-secao">
+          <h3 class="section-subheading">Filtrar horas por período, cliente e projeto</h3>
+          <p class="muted">Os três blocos abaixo (departamento, mapa de calor e distribuição por colaborador) respeitam este filtro.</p>
+          <form id="horasFiltroForm" class="horas-filtro">
+            <div class="field">
+              <label for="horasFiltroDe">De</label>
+              <input type="date" id="horasFiltroDe" />
+            </div>
+            <div class="field">
+              <label for="horasFiltroAte">Até</label>
+              <input type="date" id="horasFiltroAte" />
+            </div>
+            <div class="field">
+              <label for="horasFiltroCliente">Cliente</label>
+              <select id="horasFiltroCliente">
+                <option value="">Todos os clientes</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="horasFiltroProjeto">Projeto</label>
+              <select id="horasFiltroProjeto">
+                <option value="">Todos os projetos</option>
+              </select>
+            </div>
+            <button type="button" class="btn btn--ghost btn--small" id="limparFiltroHorasButton">Limpar filtros</button>
+          </form>
+
+          <h3 class="section-subheading">Distribuição de horas do departamento</h3>
+          <p id="departamentoChartEmptyState" class="empty-state hidden">Nenhum apontamento concluído no período/filtro selecionado.</p>
+          <div id="departamentoChartContainer" class="departamento-chart-container"></div>
+
+          <h3 class="section-subheading">Mapa de calor — Colaboradores × Projetos</h3>
+          <p class="muted">Horas de cada colaborador em cada projeto, respeitando os filtros acima. Quanto mais escura a célula, mais horas.</p>
+          <p id="heatmapEmptyState" class="empty-state hidden">Nenhum apontamento concluído no período/filtro selecionado.</p>
+          <div class="heatmap-wrap">
+            <table class="heatmap" id="heatmapTable"></table>
+          </div>
+          <div id="heatmapLegend" class="heatmap-legend hidden">
+            <span>Menos horas</span>
+            <span class="ramp"></span>
+            <span>Mais horas</span>
+          </div>
+
+          <h3 class="section-subheading">Distribuição de horas por colaborador</h3>
+          <p id="horasChartEmptyState" class="empty-state hidden">Nenhum apontamento concluído no período/filtro selecionado.</p>
+          <div id="horasChartContainer" class="horas-chart-container"></div>
+        </div>
+
+        <div class="apontamentos-secao">
+          <h3 class="section-subheading">Consumo de horas por projeto</h3>
+          <p class="muted">Total e composição por atividade de cada projeto — sempre com todo o histórico, independente dos filtros acima.</p>
+          <p id="projetoChartEmptyState" class="empty-state hidden">Nenhum apontamento concluído ainda.</p>
+          <div id="projetoChartContainer" class="horas-chart-container"></div>
+        </div>
+
+        <div class="apontamentos-secao">
+          <h3 class="section-subheading">Resumo dos projetos por IA</h3>
+          <p class="muted">
+            Pede pro Gemini escrever um resumo de onde as horas estão concentradas, qual atividade domina em cada
+            projeto e quem é o principal recurso alocado. Os números são sempre calculados pelo sistema — a IA só
+            escreve o texto em cima deles. Cada clique gera uma chamada nova (tem custo, ainda que pequeno).
+          </p>
+          <button type="button" class="btn btn--start btn--small no-print" id="gerarResumoIAButton">Gerar resumo</button>
+          <div id="resumoIAResultado" class="resumo-ia hidden"></div>
+        </div>
+
+        <div class="apontamentos-secao apontamentos-secao--perigo">
+          <h3 class="section-subheading">Excluir apontamentos de um período</h3>
+          <p class="muted">
+            Útil pra limpar dados de treinamento/teste antes de começar a usar o sistema pra valer, sem deixar ruído
+            nas análises. <strong>A exclusão é permanente e não pode ser desfeita.</strong>
+          </p>
+          <div class="danger-zone no-print">
+            <div class="danger-zone__fields">
+              <div class="field">
+                <label for="excluirPeriodoDe">De</label>
+                <input type="date" id="excluirPeriodoDe" />
+              </div>
+              <div class="field">
+                <label for="excluirPeriodoAte">Até</label>
+                <input type="date" id="excluirPeriodoAte" />
+              </div>
+              <button type="button" class="btn btn--danger btn--small" id="excluirPeriodoButton">Excluir período</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------------- Equipe ---------------- -->
+      <section id="tab-equipe" class="tab-panel card hidden">
+        <div class="panel-header">
+          <h2>Gestão e Dimensionamento de Equipe</h2>
+          <div class="panel-header__controls">
+            <label for="equipeAnoSelect" class="visually-hidden">Ano</label>
+            <select id="equipeAnoSelect"></select>
+          </div>
+        </div>
+
+        <div class="panel-header">
+          <h3 class="section-subheading" style="margin: 0;">Capacidade do ano</h3>
+          <div class="teto-control">
+            <label for="equipeTetoInput">Teto saudável</label>
+            <input type="number" id="equipeTetoInput" value="90" min="50" max="100" step="1" />
+            <span>%</span>
+          </div>
+        </div>
+        <div class="kpi-grid">
+          <div class="kpi">
+            <span class="kpi__label">Capacidade bruta</span>
+            <span class="kpi__value" id="kpiCapacidadeBrutaValue">—</span>
+            <span class="kpi__sub">colaboradores ativos × dias corridos × dedicação diária</span>
+          </div>
+          <div class="kpi">
+            <span class="kpi__label">Capacidade líquida</span>
+            <span class="kpi__value accent" id="kpiCapacidadeLiquidaValue">—</span>
+            <span class="kpi__sub">após fins de semana, feriados e emendas</span>
+          </div>
+          <div class="kpi kpi--warn">
+            <span class="kpi__label" id="kpiTetoLabel">Teto saudável</span>
+            <span class="kpi__value" id="kpiTetoValue">—</span>
+            <span class="kpi__sub" id="kpiTetoSub"></span>
+          </div>
+          <div class="kpi">
+            <span class="kpi__label" id="kpiOcupacaoLabel">Ocupação acumulada</span>
+            <span class="kpi__value accent" id="kpiOcupacaoValue">—</span>
+            <span class="kpi__sub">soma consumido ÷ soma saudável</span>
+          </div>
+          <div class="kpi">
+            <span class="kpi__label">Colaboradores ativos</span>
+            <span class="kpi__value" id="kpiColaboradoresAtivosValue">—</span>
+            <span class="kpi__sub">cadastrados como ativos hoje</span>
+          </div>
+          <div class="kpi">
+            <span class="kpi__label">Projetos executados no ano</span>
+            <span class="kpi__value" id="kpiProjetosExecutadosValue">—</span>
+            <span class="kpi__sub">com pelo menos 1 apontamento no ano</span>
+          </div>
+          <div class="kpi kpi--warn">
+            <span class="kpi__label">Meses sobrecarregados</span>
+            <span class="kpi__value" id="kpiSobrecarregadosValue">—</span>
+            <span class="kpi__sub">acima do teto saudável</span>
+          </div>
+        </div>
+        <p class="muted" style="margin-top: var(--space-3);" id="equipeSobrecarregadosDetalhe"></p>
+
+        <h3 class="section-subheading">Horas consumidas × disponíveis, mês a mês</h3>
+        <p class="muted">
+          Duas barras por mês: <strong>Disponível</strong> (capacidade saudável, considerando os dias úteis do
+          calendário) e <strong>Consumido</strong> (horas realmente apontadas, colorida conforme a situação frente
+          à capacidade líquida total).
+        </p>
+        <p id="equipeChartHorasEmptyState" class="empty-state hidden">Nenhum colaborador ativo cadastrado.</p>
+        <div class="chart-wrap">
+          <svg id="equipeChartHoras" width="720" height="300" viewBox="0 0 720 300" role="img" aria-label="Horas consumidas por mês comparadas à capacidade saudável"></svg>
+        </div>
+        <div class="legend-row">
+          <span><i style="background: var(--capacity-bar); border: 1px solid var(--capacity-bar-border);"></i>Disponível (capacidade saudável)</span>
+          <span><i style="background: var(--status-good)"></i>Consumido — até <span id="equipeLegendTetoGood">90</span>% da líquida</span>
+          <span><i style="background: var(--status-warning)"></i>Consumido — <span id="equipeLegendTetoWarn">90</span>–100% da líquida</span>
+          <span><i style="background: var(--status-critical)"></i>Consumido — acima de 100% da líquida</span>
+        </div>
+
+        <p class="muted" style="margin-top: var(--space-4);">
+          Percentual consumido — mesma base de meses, mas em escala de 0–100% (painel separado, não uma segunda
+          escala no mesmo gráfico, pra não distorcer a leitura).
+        </p>
+        <div class="chart-wrap">
+          <svg id="equipeChartPct" width="720" height="130" viewBox="0 0 720 130" role="img" aria-label="Percentual da capacidade consumido por mês"></svg>
+        </div>
+        <div class="legend-row">
+          <span><i class="solidline"></i>% da capacidade líquida consumido</span>
+          <span style="color: var(--status-warning);">┈┈ <span id="equipeLegendTetoLine">90</span>% (teto saudável)</span>
+          <span style="color: var(--status-critical);">┈┈ 100% (capacidade líquida total)</span>
+        </div>
+
+        <h3 class="section-subheading">Horas disponíveis e colaboradores ativos, mês a mês</h3>
+        <p class="muted">
+          Barra = horas <strong>disponíveis</strong> no mês (eixo à esquerda). Linha roxa = colaboradores com pelo
+          menos 1 apontamento naquele mês (eixo à direita — rótulos na cor da linha).
+        </p>
+        <div class="chart-wrap">
+          <svg id="equipeChartColabDual" width="720" height="300" viewBox="0 0 720 300" role="img" aria-label="Horas disponíveis e colaboradores ativos por mês"></svg>
+        </div>
+        <div class="legend-row">
+          <span><i style="background: var(--color-primary)"></i>Horas disponíveis (esquerda)</span>
+          <span><i class="line" style="border-color: var(--count-line); opacity: 1;"></i>Colaboradores com apontamento no mês (direita)</span>
+        </div>
+
+        <h3 class="section-subheading">Horas disponíveis e projetos executados, mês a mês</h3>
+        <p class="muted">Mesma composição: barra = horas disponíveis (esquerda); linha = projetos com apontamento no mês (direita).</p>
+        <div class="chart-wrap">
+          <svg id="equipeChartProjDual" width="720" height="300" viewBox="0 0 720 300" role="img" aria-label="Horas disponíveis e projetos executados por mês"></svg>
+        </div>
+        <div class="legend-row">
+          <span><i style="background: var(--color-primary)"></i>Horas disponíveis (esquerda)</span>
+          <span><i class="line" style="border-color: var(--count-line); opacity: 1;"></i>Projetos com apontamento no mês (direita)</span>
+        </div>
+
+        <h3 class="section-subheading">Horas consumidas por projeto, por atividade</h3>
+        <p class="muted">Apontamentos do ano selecionado, agrupados por projeto e por atividade.</p>
+        <p id="equipeProjectBarsEmptyState" class="empty-state hidden">Nenhum apontamento concluído no ano selecionado.</p>
+        <div id="equipeProjectBarsContainer" class="horas-chart-container"></div>
+
+        <h3 class="section-subheading">Composição das horas por cargo</h3>
+        <p class="muted">Soma das horas do ano selecionado de cada colaborador, agrupada pelo campo "Cargo" do cadastro.</p>
+        <p id="equipeCargoDonutEmptyState" class="empty-state hidden">Nenhum apontamento concluído no ano selecionado.</p>
+        <div id="equipeCargoDonutContainer" class="departamento-chart-container"></div>
+
+        <h3 class="section-subheading">Mapa de calor — Projetos × Meses</h3>
+        <p class="muted">Quais projetos consumiram mais horas em quais meses do ano selecionado — quanto mais escura a célula, mais horas.</p>
+        <p id="equipeHeatmapEmptyState" class="empty-state hidden">Nenhum apontamento concluído no ano selecionado.</p>
+        <div class="heatmap-wrap">
+          <table class="heatmap heatmap--months" id="equipeHeatmapTable"></table>
+        </div>
+        <div id="equipeHeatmapLegend" class="heatmap-legend hidden">
+          <span>Menos horas</span>
+          <span class="ramp"></span>
+          <span>Mais horas</span>
+        </div>
+      </section>
+
+      <!-- ---------------- Financeira ---------------- -->
+      <section id="tab-financeira" class="tab-panel card hidden">
+        <div class="panel-header">
+          <h2>Financeira</h2>
+          <div class="panel-header__controls">
+            <label for="financeiraAnoSelect" class="visually-hidden">Ano</label>
+            <select id="financeiraAnoSelect"></select>
+          </div>
+        </div>
+
+        <div class="kpi-grid">
+          <div class="kpi">
+            <span class="kpi__label">Custo do departamento por ano</span>
+            <span class="kpi__value" id="kpiCustoAnoValue">—</span>
+            <span class="kpi__sub">soma do custo mensal dos colaboradores ativos × 12</span>
+          </div>
+          <div class="kpi">
+            <span class="kpi__label">Valor orçado</span>
+            <span class="kpi__value accent" id="kpiOrcadoAnoValue">—</span>
+            <span class="kpi__sub">projetos orçados com apontamento, exceto internos</span>
+          </div>
+          <div class="kpi">
+            <span class="kpi__label">Margem acumulada</span>
+            <span class="kpi__value" id="kpiMargemAnoValue">—</span>
+            <span class="kpi__sub" id="kpiMargemAnoSub"></span>
+          </div>
+          <div class="kpi kpi--warn">
+            <span class="kpi__label">Projetos no prejuízo</span>
+            <span class="kpi__value" id="kpiProjetosPrejuizoValue">—</span>
+            <span class="kpi__sub">custo acumulado acima do orçado</span>
+          </div>
+        </div>
+
+        <h3 class="section-subheading">Custo × receita reconhecida por mês</h3>
+        <p class="muted">
+          Linha escura = custo do departamento (soma fixa dos salários dos colaboradores ativos — não varia com
+          dias úteis). Barras = valor orçado dos projetos que concluíram naquele mês (receita reconhecida de uma
+          vez, na conclusão). Linha tracejada azul = receita média do ano — se ficar acima da linha de custo, essa
+          distância é o espaço médio mensal pra cobrir custo fixo e ainda sobrar pra investimento.
+        </p>
+        <p id="financeiraCustoMensalEmptyState" class="empty-state hidden">Nenhum colaborador ativo cadastrado.</p>
+        <div class="chart-wrap">
+          <svg id="chartFinanceiraCustoMensal" height="260" viewBox="0 0 720 260" role="img" aria-label="Custo do departamento e receita reconhecida por mês"></svg>
+        </div>
+        <div class="legend-row">
+          <span><i style="background: var(--activity-3)"></i>Receita reconhecida (projeto concluído no mês)</span>
+          <span><i class="line" style="border-top: 2px solid var(--color-text); border-color: var(--color-text);"></i>Custo do departamento</span>
+          <span><i class="line" style="border-top: 1.5px dashed var(--activity-1); border-color: var(--activity-1);"></i>Receita média do ano</span>
+        </div>
+
+        <h3 class="section-subheading">Margem por projeto</h3>
+        <p class="muted">Valor orçado menos custo de mão de obra acumulado até agora. Projetos internos (sem orçamento) ficam de fora — aparecem só nos gráficos de custo abaixo.</p>
+        <p id="financeiraMargemEmptyState" class="empty-state hidden">Nenhum projeto orçado com apontamento ainda.</p>
+        <div class="margem-rows" id="financeiraMargemRows"></div>
+
+        <h3 class="section-subheading">% do orçamento consumido</h3>
+        <p class="muted">Progresso do custo acumulado frente ao valor orçado — sinaliza quem está perto ou já passou do limite antes mesmo de terminar.</p>
+        <p id="financeiraOrcamentoEmptyState" class="empty-state hidden">Nenhum projeto orçado com apontamento ainda.</p>
+        <div class="orcamento-rows" id="financeiraOrcamentoRows"></div>
+
+        <h3 class="section-subheading">Projeção de custo por projeto</h3>
+        <p class="muted">
+          Cada linha é um projeto, indexado a % do prazo previsto decorrido (eixo X) e % do orçamento consumido
+          (eixo Y). A diagonal pontilhada é o "ritmo ideal". Trecho sólido = custo real até hoje; trecho tracejado =
+          projeção até o término previsto, pela taxa de consumo dos últimos 3 meses. Clique num projeto na legenda
+          pra ocultar/mostrar.
+        </p>
+        <div class="projecao-toolbar">
+          <div class="projecao-legend" id="financeiraProjecaoLegend"></div>
+          <div class="chart-zoom-controls">
+            <span class="chart-zoom-controls__label">Zoom</span>
+            <button type="button" class="chart-zoom-btn" id="financeiraProjecaoZoomOut" aria-label="Diminuir zoom">−</button>
+            <span id="financeiraProjecaoZoomLevel">100%</span>
+            <button type="button" class="chart-zoom-btn" id="financeiraProjecaoZoomIn" aria-label="Aumentar zoom">+</button>
+          </div>
+        </div>
+        <p id="financeiraProjecaoEmptyState" class="empty-state hidden">Nenhum projeto orçado com datas previstas cadastradas.</p>
+        <div class="chart-wrap">
+          <svg id="chartFinanceiraProjecao" height="380" viewBox="0 0 780 380" role="img" aria-label="Projeção de custo por projeto"></svg>
+        </div>
+        <div class="legend-row">
+          <span><i class="line" style="border-top: 1.5px dashed var(--color-border); border-color: var(--color-border);"></i>Ritmo ideal (diagonal)</span>
+          <span><i class="line" style="border-top: 1px dashed var(--status-critical); border-color: var(--status-critical); opacity:0.6;"></i>Limite do orçado (100%)</span>
+          <span>● = hoje · linha sólida = real · linha tracejada = projeção</span>
+        </div>
+
+        <h3 class="section-subheading">Acompanhamento de desvios — custo × prazo</h3>
+        <p class="muted">
+          Uma "raio-x" de todos os projetos de uma vez, pra triagem rápida. Eixo X = % do prazo previsto já
+          decorrido. Eixo Y = ritmo de custo (100% = gastando exatamente no ritmo esperado). Tamanho da bolha =
+          quanto tempo ainda falta no projeto. O círculo vermelho é a média do portfólio.
+        </p>
+        <p id="financeiraBolhasEmptyState" class="empty-state hidden">Nenhum projeto orçado com datas previstas cadastradas.</p>
+        <div class="chart-wrap">
+          <svg id="chartFinanceiraBolhas" height="420" viewBox="0 0 720 420" role="img" aria-label="Acompanhamento de desvios de custo e prazo por projeto"></svg>
+        </div>
+        <div class="legend-row">
+          <span><i style="background:var(--status-good-bg); border:1px solid var(--color-border);"></i>Ritmo OK</span>
+          <span><i style="background:var(--status-warning-bg); border:1px solid var(--color-border);"></i>Atenção</span>
+          <span><i style="background:var(--status-critical-bg); border:1px solid var(--color-border);"></i>Crítico</span>
+          <span>tamanho da bolha = duração restante estimada</span>
+        </div>
+
+        <h3 class="section-subheading">Composição de custo por cargo</h3>
+        <p class="muted">Custo anual do departamento, agrupado pelo campo "Cargo" do cadastro de Colaboradores.</p>
+        <p id="financeiraCustoCargoEmptyState" class="empty-state hidden">Nenhum colaborador ativo com custo cadastrado.</p>
+        <div class="departamento-chart-container" id="financeiraCustoCargoContainer"></div>
+        <p class="chart-footnote">Por que olhar isso: mostra se o custo do departamento está concentrado demais numa faixa de senioridade — ajuda a decidir se contratar mais júnior/estagiário é uma forma de aliviar custo fixo sem perder capacidade.</p>
+
+        <h3 class="section-subheading">Custo de mão de obra por projeto, por atividade</h3>
+        <p class="muted">Mesmo padrão do gráfico de horas por projeto/atividade da aba Apontamentos, convertido em R$ (horas × custo/hora de quem apontou).</p>
+        <p id="financeiraCustoProjetoEmptyState" class="empty-state hidden">Nenhum apontamento concluído no ano selecionado.</p>
+        <div id="financeiraCustoProjetoContainer" class="horas-chart-container"></div>
+        <p class="chart-footnote">Por que olhar isso: mostra não só quanto cada projeto custou, mas em qual etapa do trabalho o dinheiro foi gasto — ajuda a orçar projetos parecidos no futuro e a identificar atividades que consistentemente consomem mais do que o esperado.</p>
+      </section>
+
+      <!-- ---------------- Estratégia ---------------- -->
+      <section id="tab-estrategia" class="tab-panel card hidden">
+        <div class="panel-header">
+          <h2>Estratégia</h2>
+          <div class="panel-header__controls">
+            <label for="estrategiaCenarioSelect" class="visually-hidden">Cenário</label>
+            <select id="estrategiaCenarioSelect"></select>
+            <button type="button" class="btn btn--ghost btn--small" id="novoCenarioButton">Novo cenário</button>
+            <button type="button" class="btn btn--start btn--small" id="salvarCenarioButton">Salvar</button>
+            <button type="button" class="btn btn--ghost btn--small" id="excluirCenarioButton">Excluir</button>
+          </div>
+        </div>
+
+        <div class="field-note">
+          Cenários ficam salvos — você monta, sai, e volta pra continuar editando ou comparando depois. O "Time atual" é sempre a referência real, só leitura.
+        </div>
+
+        <p id="estrategiaEmptyState" class="empty-state hidden">Nenhum cenário criado ainda. Clique em "Novo cenário" para começar.</p>
+
+        <div id="estrategiaConteudo" class="hidden">
+          <div class="field" style="max-width: 360px;">
+            <label for="estrategiaCenarioNome">Nome do cenário</label>
+            <input type="text" id="estrategiaCenarioNome" placeholder="Ex.: +2 consultores, -1 estagiária" />
+          </div>
+
+          <h3 class="section-subheading">Time atual × Cenário</h3>
+          <div class="kpi-grid">
+            <div class="kpi">
+              <span class="kpi__label">Colaboradores</span>
+              <span class="kpi__value" id="estrategiaKpiColaboradoresValue">—</span>
+              <span class="kpi__sub" id="estrategiaKpiColaboradoresSub"></span>
+            </div>
+            <div class="kpi">
+              <span class="kpi__label">Custo mensal do cenário</span>
+              <span class="kpi__value" id="estrategiaKpiCustoValue">—</span>
+              <span class="kpi__sub" id="estrategiaKpiCustoSub"></span>
+            </div>
+            <div class="kpi">
+              <span class="kpi__label">Capacidade líquida/mês</span>
+              <span class="kpi__value" id="estrategiaKpiCapacidadeValue">—</span>
+              <span class="kpi__sub" id="estrategiaKpiCapacidadeSub"></span>
+            </div>
+            <div class="kpi">
+              <span class="kpi__label">Custo por hora disponível</span>
+              <span class="kpi__value" id="estrategiaKpiCustoHoraValue">—</span>
+              <span class="kpi__sub" id="estrategiaKpiCustoHoraSub"></span>
+            </div>
+          </div>
+          <p class="muted" style="margin-top: var(--space-3);">
+            "Custo por hora disponível" ajuda a comparar cenários de tamanhos diferentes: contratar sênior encarece mais
+            que contratar júnior, mas cada hora sênior também pode valer mais — essa métrica sozinha não decide, mas
+            contextualiza.
+          </p>
+
+          <h3 class="section-subheading">Horas disponíveis por cargo</h3>
+          <p class="muted">Capacidade líquida mensal (mesmo cálculo de calendário da aba Equipe), atual vs. cenário, por cargo.</p>
+          <p id="estrategiaHorasCargoEmptyState" class="empty-state hidden">Nenhum colaborador ativo cadastrado.</p>
+          <div class="chart-wrap">
+            <svg id="chartEstrategiaHorasCargo" height="240" viewBox="0 0 720 240" role="img" aria-label="Horas disponíveis por cargo, atual vs cenário"></svg>
+          </div>
+
+          <h3 class="section-subheading">Custo por cargo</h3>
+          <p class="muted">Custo mensal (salário + encargos), atual vs. cenário, por cargo.</p>
+          <p id="estrategiaCustoCargoEmptyState" class="empty-state hidden">Nenhum colaborador ativo cadastrado.</p>
+          <div class="chart-wrap">
+            <svg id="chartEstrategiaCustoCargo" height="240" viewBox="0 0 720 240" role="img" aria-label="Custo mensal por cargo, atual vs cenário"></svg>
+          </div>
+          <div class="legend-row">
+            <span><i style="background: var(--capacity-bar); border: 1px solid var(--capacity-bar-border);"></i>Time atual</span>
+            <span><i style="background: var(--count-line)"></i>Cenário</span>
+          </div>
+
+          <h3 class="section-subheading">Elenco do cenário</h3>
+          <p class="muted">Parte do time atual, com ajustes: adicione um jogador hipotético, remova alguém (simula desligamento) ou altere cargo/dedicação/custo de quem já está.</p>
+
+          <form id="elencoItemForm" class="inline-form hidden">
+            <input type="hidden" id="elencoItemChave" />
+            <div class="field">
+              <label for="elencoItemNome">Nome</label>
+              <input type="text" id="elencoItemNome" required />
+            </div>
+            <div class="field">
+              <label for="elencoItemCargo">Cargo</label>
+              <input type="text" id="elencoItemCargo" required />
+            </div>
+            <div class="field">
+              <label for="elencoItemDedicacao">Dedicação diária (horas)</label>
+              <input type="number" id="elencoItemDedicacao" value="8" min="1" max="12" step="0.5" />
+            </div>
+            <div class="field">
+              <label for="elencoItemCusto">Custo mensal (R$)</label>
+              <input type="number" id="elencoItemCusto" min="0" step="100" />
+            </div>
+            <div class="inline-form__actions">
+              <button type="submit" class="btn btn--start btn--small">Salvar</button>
+              <button type="button" class="btn btn--ghost btn--small" id="cancelElencoItemButton">Cancelar</button>
+            </div>
+          </form>
+
+          <div class="table-wrapper">
+            <table class="elenco-table">
+              <thead><tr><th>Nome</th><th>Cargo</th><th>Dedicação</th><th>Custo mensal</th><th>Situação</th><th></th></tr></thead>
+              <tbody id="estrategiaElencoBody"></tbody>
+            </table>
+          </div>
+          <button type="button" class="btn btn--ghost btn--small" id="addElencoItemButton" style="margin-top: var(--space-3);">+ Adicionar jogador hipotético</button>
+
+          <div class="deferred-note">
+            "Horas disponíveis" aqui é só oferta (quanto o cargo consegue produzir). Ainda não há uma estimativa de
+            "horas necessárias" por cargo — isso depende de um pipeline de projetos futuros orçados, uma frente
+            separada e ainda não desenvolvida. Por enquanto, use a ocupação real da aba Equipe como referência
+            complementar pra avaliar se sobra ou falta gente.
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------------- Relatório individual (sem botão fixo no menu — aberto pelo botão "Relatório" da aba Colaboradores) ---------------- -->
+      <section id="tab-relatorio" class="tab-panel card hidden">
+        <div class="panel-header">
+          <div>
+            <h2>Relatório individual — Apontamentos</h2>
+            <p class="subtitle" id="relatorioSubtitle"></p>
+          </div>
+          <div class="panel-header__controls">
+            <label for="relatorioColaboradorSelect" class="visually-hidden">Colaborador</label>
+            <select id="relatorioColaboradorSelect"></select>
+            <label for="relatorioMesSelect" class="visually-hidden">Mês</label>
+            <select id="relatorioMesSelect"></select>
+            <button type="button" class="btn btn--ghost btn--small" id="relatorioVoltarButton">Voltar</button>
+            <button type="button" class="btn btn--ghost btn--small" id="relatorioExportPdfButton">Exportar PDF</button>
+          </div>
+        </div>
+
+        <p id="relatorioEmptyState" class="empty-state hidden">Nenhum apontamento neste mês para este colaborador.</p>
+
+        <div id="relatorioConteudo">
+          <div class="resumo-box" id="relatorioResumoBox"></div>
+
+          <h3 class="section-subheading">Carga horária do mês</h3>
+          <div class="kpi-grid">
+            <div class="kpi">
+              <span class="kpi__label">Carga prevista no mês</span>
+              <span class="kpi__value" id="relatorioKpiCargaValue">—</span>
+              <span class="kpi__sub" id="relatorioKpiCargaSub"></span>
+            </div>
+            <div class="kpi">
+              <span class="kpi__label">Horas apontadas</span>
+              <span class="kpi__value" id="relatorioKpiHorasValue">—</span>
+              <span class="kpi__sub" id="relatorioKpiHorasSub"></span>
+            </div>
+            <div class="kpi">
+              <span class="kpi__label">Dias sem apontamento</span>
+              <span class="kpi__value" id="relatorioKpiFaltasValue">—</span>
+              <span class="kpi__sub" id="relatorioKpiFaltasSub"></span>
+            </div>
+            <div class="kpi">
+              <span class="kpi__label">Média por dia útil</span>
+              <span class="kpi__value" id="relatorioKpiMediaValue">—</span>
+              <span class="kpi__sub" id="relatorioKpiMediaSub"></span>
+            </div>
+          </div>
+
+          <h3 class="section-subheading">Comportamento de apontamento</h3>
+          <p class="muted">Compara o dia em que a atividade foi trabalhada com o dia em que foi realmente registrada — mostra se o colaborador aponta em dia ou em lote (fim de semana/fim do mês).</p>
+          <p id="relatorioComportamentoEmptyState" class="empty-state hidden">Sem apontamentos com data de registro suficientes pra essa análise neste mês.</p>
+          <div id="relatorioComportamentoConteudo">
+            <div class="kpi-grid">
+              <div class="kpi">
+                <span class="kpi__label">Atraso médio no apontamento</span>
+                <span class="kpi__value" id="relatorioKpiAtrasoValue">—</span>
+                <span class="kpi__sub" id="relatorioKpiAtrasoSub"></span>
+              </div>
+            </div>
+            <p class="muted" id="relatorioComportamentoResumo" style="margin-top: var(--space-3);"></p>
+            <p class="muted"><strong>Em qual dia da semana costuma registrar</strong> — soma das horas registradas em cada dia da semana (não o dia trabalhado, o dia do registro em si).</p>
+            <div class="chart-wrap">
+              <svg id="chartRelatorioComportamento" height="180" viewBox="0 0 480 180" role="img" aria-label="Em qual dia da semana o colaborador costuma registrar apontamentos"></svg>
+            </div>
+          </div>
+
+          <h3 class="section-subheading">Horas apontadas por dia</h3>
+          <p class="muted">Cada barra é um dia do mês. Linha tracejada = meta diária. Vermelho = dia útil sem apontamento.</p>
+          <div class="chart-wrap">
+            <svg id="chartRelatorioStatus" height="260" viewBox="0 0 820 260" role="img" aria-label="Horas apontadas por dia"></svg>
+          </div>
+          <div class="legend-row">
+            <span><i style="background: var(--status-good)"></i>Dentro da meta</span>
+            <span><i style="background: var(--status-warning)"></i>Abaixo de 70% da meta</span>
+            <span><i style="background: var(--status-critical)"></i>Sem apontamento</span>
+            <span><i class="line" style="border-top: 2px dashed var(--color-text); border-color: var(--color-text);"></i>Meta diária</span>
+          </div>
+
+          <h3 class="section-subheading">Horas por dia, por atividade</h3>
+          <p class="muted">Mesmas barras, empilhadas por atividade — em qual etapa do trabalho o tempo foi gasto dia a dia.</p>
+          <div class="chart-wrap">
+            <svg id="chartRelatorioAtividade" height="260" viewBox="0 0 820 260" role="img" aria-label="Horas por dia, por atividade"></svg>
+          </div>
+          <div class="legend-row" id="legendRelatorioAtividade"></div>
+
+          <h3 class="section-subheading">Distribuição por atividade</h3>
+          <p class="muted">Como as horas do mês se dividem entre as atividades, com a média diária de cada uma ao longo dos dias úteis.</p>
+          <div class="atividade-split">
+            <div class="atividade-split__svg">
+              <svg id="chartRelatorioPizza" width="200" height="200" viewBox="0 0 200 200" role="img" aria-label="Distribuição de horas por atividade"></svg>
+            </div>
+            <table class="atividade-table">
+              <thead><tr><th>Atividade</th><th>Horas</th><th>%</th><th>Média/dia útil</th></tr></thead>
+              <tbody id="relatorioAtividadeTableBody"></tbody>
+            </table>
+          </div>
+          <p class="chart-footnote">Média calculada sobre todos os dias úteis do mês (não só os dias em que a atividade apareceu).</p>
+
+          <h3 class="section-subheading">Projetos × Atividades</h3>
+          <p class="muted">Em quais projetos o tempo foi mais concentrado no mês, e em qual atividade dentro de cada um. Projetos ordenados do que mais consumiu tempo para o que menos.</p>
+          <p id="relatorioHeatmapEmptyState" class="empty-state hidden">Nenhum apontamento neste mês para montar o mapa de calor.</p>
+          <div class="heatmap-wrap">
+            <table class="heatmap" id="relatorioHeatmapTable"></table>
+          </div>
+          <div id="relatorioHeatmapLegend" class="heatmap-legend hidden">
+            <span>Menos horas</span>
+            <span class="ramp"></span>
+            <span>Mais horas</span>
+          </div>
+        </div>
+      </section>
+
+    </section>
+
+  </main>
+
+  <footer class="admin-footer">
+    <p class="admin-footer__title">Gestão de Pessoas — Agricef, Experimentação Agrícola</p>
+    <p class="admin-footer__meta">Desenvolvido por Rafael de Souza Favalli · Julho de 2026 · última atualização em Agosto de 2026</p>
+    <p class="admin-footer__notice">Dashboard em fase de implementação — os resultados apresentados estão sujeitos a revisão.</p>
+    <p class="admin-footer__tech">Dados armazenados em uma planilha do Google Sheets, acessada via Google Apps Script. Veja <code>backend/SETUP.md</code> para detalhes.</p>
+  </footer>
+
+  <script src="js/data.js"></script>
+  <script src="js/holidays.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
