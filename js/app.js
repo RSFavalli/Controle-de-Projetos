@@ -5,15 +5,17 @@
  * login (com fallback offline), cronômetro, lista de apontamentos do
  * dia e alertas.
  *
- * Sobre a senha em memória: depois do login, a senha digitada fica
- * apenas em uma variável JS (não é salva em localStorage) e é usada
- * para chamar a API quando for preciso sincronizar Clientes/Projetos.
- * Se a página for recarregada, essa variável se perde por design —
- * a sessão (quem está logado) continua salva e o app funciona
- * normalmente com os dados em cache, mas para sincronizar de novo o
- * app pede para confirmar a senha uma vez (tela "Confirmar senha").
- * Isso evita guardar a senha em texto puro no dispositivo enquanto
- * ainda permite uso 100% offline depois do primeiro login.
+ * Sobre a senha do dispositivo: depois do login, a senha digitada é
+ * salva neste aparelho (DB.setSenhaDispositivo, em js/db.js) além de
+ * ficar em uma variável JS (inMemorySenha), usada para chamar a API
+ * quando for preciso sincronizar Clientes/Projetos/Apontamentos. Se a
+ * página recarregar, a variável em memória some, mas é restaurada a
+ * partir do que foi salvo (ver init()) — assim a sincronização
+ * automática continua funcionando sozinha em segundo plano, sem
+ * depender de alguém reabrir a tela "Confirmar senha" manualmente.
+ * A tela de reautenticação continua existindo como caminho manual
+ * (ex.: sessões antigas de antes dessa mudança) e onLogout() limpa a
+ * senha salva no dispositivo.
  * ------------------------------------------------------------------
  */
 
@@ -21,6 +23,15 @@
   const END_OF_DAY_HOUR = 18; // a partir dessa hora, avisa sobre atividade aberta
 
   let inMemorySenha = null; // só dura enquanto a aba estiver aberta
+  let alertsIntervalId = null;
+
+  // Dia sendo exibido/editado na lista de apontamentos — null = hoje. Dá pra
+  // navegar até ENTRIES_DAYS_BACK dias atrás pra corrigir um apontamento
+  // esquecido (o cronômetro em si sempre aponta pra hoje, isso só afeta a
+  // lista/edição de lançamentos já feitos).
+  let entriesViewDate = null;
+  const ENTRIES_DAYS_BACK = 30;
+  const DIAS_SEMANA = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 
   const els = {
     clientSelect: document.getElementById('clientSelect'),
@@ -36,6 +47,9 @@
     entriesEmptyState: document.getElementById('entriesEmptyState'),
     todayTotal: document.getElementById('todayTotal'),
     entriesSyncStatus: document.getElementById('entriesSyncStatus'),
+    entriesDayPrev: document.getElementById('entriesDayPrev'),
+    entriesDayNext: document.getElementById('entriesDayNext'),
+    entriesDayLabel: document.getElementById('entriesDayLabel'),
 
     editEntryForm: document.getElementById('editEntryForm'),
     editEntryId: document.getElementById('editEntryId'),
@@ -105,7 +119,17 @@
 
     const session = DB.getSession();
     if (session) {
+      // Restaura a senha salva neste aparelho (se houver) — sem isso, a
+      // sessão volta "logada" mas a sincronização automática ficava
+      // travada em silêncio até alguém abrir a tela de confirmar senha
+      // manualmente, e apontamentos ficavam parados sem ninguém perceber.
+      const senhaSalva = DB.getSenhaDispositivo();
+      if (senhaSalva) inMemorySenha = senhaSalva;
       enterApp(session);
+      if (inMemorySenha) {
+        syncData(session.email, inMemorySenha, { silent: true });
+        syncEntries({ silent: true });
+      }
     } else {
       showScreen('login');
     }
@@ -133,6 +157,9 @@
     els.editEntryClient.addEventListener('change', () => {
       populateEditProjectSelect(els.editEntryClient.value);
     });
+
+    els.entriesDayPrev.addEventListener('click', () => onEntriesDayNav(-1));
+    els.entriesDayNext.addEventListener('click', () => onEntriesDayNav(1));
   }
 
   function showScreen(name) {
@@ -198,6 +225,7 @@
       const profile = await Api.login(email, senha);
       await DB.cacheAuthSuccess(email, senha, profile);
       DB.setSession(profile);
+      DB.setSenhaDispositivo(senha);
       inMemorySenha = senha;
       els.loginPassword.value = '';
       enterApp(profile);
@@ -213,6 +241,7 @@
       const cachedProfile = await DB.verifyOfflineLogin(email, senha);
       if (cachedProfile) {
         DB.setSession(cachedProfile);
+        DB.setSenhaDispositivo(senha);
         inMemorySenha = senha;
         els.loginPassword.value = '';
         toast('Login offline (sem conexão). Sincronize quando tiver internet novamente.', 'success');
@@ -229,6 +258,7 @@
   function onLogout() {
     inMemorySenha = null;
     DB.clearSession();
+    DB.clearSenhaDispositivo();
     els.loginEmail.value = '';
     els.loginPassword.value = '';
     showScreen('login');
@@ -241,7 +271,8 @@
     updateSyncStatusUi();
     refreshAppUi();
     Timer.startTicking(tickClock);
-    setInterval(renderAlerts, 60 * 1000);
+    if (alertsIntervalId) clearInterval(alertsIntervalId);
+    alertsIntervalId = setInterval(renderAlerts, 60 * 1000);
   }
 
   /* ------------------------------ Sincronização ----------------------------- */
@@ -265,6 +296,7 @@
     try {
       const profile = await Api.login(session.email, senha);
       inMemorySenha = senha;
+      DB.setSenhaDispositivo(senha);
       await DB.cacheAuthSuccess(session.email, senha, profile);
       els.reauthPassword.value = '';
       showScreen('app');
@@ -642,15 +674,53 @@
 
   /* ------------------------------ Renderização ---------------------------- */
 
+  function addDaysToDateStr(dateStr, delta) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    date.setDate(date.getDate() + delta);
+    return Timer.todayDateStr(date);
+  }
+
+  function formatDiaLabel(dateStr) {
+    const hoje = Timer.todayDateStr();
+    if (dateStr === hoje) return 'Hoje';
+    if (dateStr === addDaysToDateStr(hoje, -1)) return 'Ontem';
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    return `${DIAS_SEMANA[date.getDay()]}, ${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}`;
+  }
+
+  function onEntriesDayNav(delta) {
+    const hoje = Timer.todayDateStr();
+    const limite = addDaysToDateStr(hoje, -ENTRIES_DAYS_BACK);
+    const atual = entriesViewDate || hoje;
+    const proximo = addDaysToDateStr(atual, delta);
+    if (proximo > hoje || proximo < limite) return;
+    entriesViewDate = proximo === hoje ? null : proximo;
+    closeEditEntryForm();
+    renderEntries();
+  }
+
+  function updateEntriesDayNav(dateStr) {
+    const hoje = Timer.todayDateStr();
+    const limite = addDaysToDateStr(hoje, -ENTRIES_DAYS_BACK);
+    els.entriesDayLabel.textContent = formatDiaLabel(dateStr);
+    els.entriesDayNext.disabled = dateStr >= hoje;
+    els.entriesDayPrev.disabled = dateStr <= limite;
+  }
+
   function renderEntries() {
     const session = DB.getSession();
     if (!session) return;
-    const today = Timer.todayDateStr();
-    const entries = DB.getEntriesByEmployeeAndDate(session.id, today).sort((a, b) =>
+    const viewDate = entriesViewDate || Timer.todayDateStr();
+    updateEntriesDayNav(viewDate);
+    const entries = DB.getEntriesByEmployeeAndDate(session.id, viewDate).sort((a, b) =>
       (a.startTime || '').localeCompare(b.startTime || '')
     );
 
     els.entriesTableBody.innerHTML = '';
+    els.entriesEmptyState.textContent =
+      viewDate === Timer.todayDateStr() ? 'Nenhum apontamento registrado hoje ainda.' : 'Nenhum apontamento registrado neste dia.';
     els.entriesEmptyState.classList.toggle('hidden', entries.length !== 0);
 
     let totalMinutes = 0;

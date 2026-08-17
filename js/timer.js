@@ -25,8 +25,11 @@ const Timer = (() => {
   }
 
   function formatHm(totalMinutes) {
-    const h = Math.floor(totalMinutes / 60);
-    const m = Math.round(totalMinutes % 60);
+    // Arredonda o total primeiro (não os minutos isolados), senão um resto
+    // como 59.6 vira "60" em vez de virar a próxima hora — ex.: 00:60.
+    const rounded = Math.round(totalMinutes);
+    const h = Math.floor(rounded / 60);
+    const m = rounded % 60;
     return `${pad(h)}:${pad(m)}`;
   }
 

@@ -34,6 +34,7 @@ const DB_KEYS = {
   LAST_SYNC: 'ts_last_sync',
   PENDING_DELETES: 'ts_pending_deletes',
   LAST_ENTRIES_SYNC: 'ts_last_entries_sync',
+  SENHA_DISPOSITIVO: 'ts_senha_dispositivo',
 };
 
 function dbRead(key, fallback) {
@@ -187,6 +188,25 @@ function clearSession() {
   localStorage.removeItem(DB_KEYS.SESSION);
 }
 
+/* ---------------------- Senha do colaborador neste aparelho ---------------------- */
+/* Guardada em texto puro no dispositivo por decisão explícita (trade-off de
+ * segurança por conveniência) — sem ela, a senha só vive em memória e some a
+ * cada vez que a página recarrega (comum em navegador de celular), o que
+ * travava a sincronização automática silenciosamente e já causou perda de
+ * apontamentos não sincronizados no campo. Sempre limpa no logout. */
+
+function getSenhaDispositivo() {
+  return dbRead(DB_KEYS.SENHA_DISPOSITIVO, null);
+}
+
+function setSenhaDispositivo(senha) {
+  dbWrite(DB_KEYS.SENHA_DISPOSITIVO, senha);
+}
+
+function clearSenhaDispositivo() {
+  localStorage.removeItem(DB_KEYS.SENHA_DISPOSITIVO);
+}
+
 /* ---------------------- Cache de autenticação offline ---------------------- */
 /* Guarda, por e-mail, um verificador derivado da senha (SHA-256 local, com
  * "tempero" só deste app — nada a ver com o hash guardado no backend) e o
@@ -273,6 +293,10 @@ window.DB = {
   getSession,
   setSession,
   clearSession,
+
+  getSenhaDispositivo,
+  setSenhaDispositivo,
+  clearSenhaDispositivo,
 
   cacheAuthSuccess,
   verifyOfflineLogin,

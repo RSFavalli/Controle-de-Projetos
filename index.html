@@ -153,12 +153,19 @@
       <!-- Apontamentos do dia -->
       <section class="card entries-card" aria-labelledby="entriesHeading">
         <div class="entries-card__header">
-          <h2 id="entriesHeading">Apontamentos de hoje</h2>
+          <h2 id="entriesHeading">Apontamentos</h2>
           <div class="entries-card__header-right">
             <span id="entriesSyncStatus" class="entries-card__sync-status"></span>
             <span id="todayTotal" class="entries-card__total">Total: 00:00</span>
           </div>
         </div>
+
+        <div class="entries-day-nav">
+          <button type="button" id="entriesDayPrev" class="entries-day-nav__btn" aria-label="Dia anterior">‹</button>
+          <span id="entriesDayLabel" class="entries-day-nav__label">Hoje</span>
+          <button type="button" id="entriesDayNext" class="entries-day-nav__btn" aria-label="Próximo dia" disabled>›</button>
+        </div>
+        <p class="field-hint entries-day-nav__hint">É possível corrigir apontamentos dos últimos 30 dias.</p>
 
         <form id="editEntryForm" class="edit-entry-form hidden">
           <h3>Editar apontamento</h3>

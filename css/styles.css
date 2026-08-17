@@ -450,6 +450,46 @@ textarea {
   font-weight: 600;
 }
 
+.entries-day-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-1);
+}
+
+.entries-day-nav__btn {
+  font: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-primary);
+  background: transparent;
+  color: var(--color-primary-dark);
+  cursor: pointer;
+}
+
+.entries-day-nav__btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  border-color: var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.entries-day-nav__label {
+  min-width: 11ch;
+  text-align: center;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.entries-day-nav__hint {
+  text-align: center;
+  margin-bottom: var(--space-3);
+}
+
 .table-wrapper {
   overflow-x: auto;
 }
