@@ -68,6 +68,28 @@ h1, h2, h3 {
   display: none !important;
 }
 
+/* --------------------------- Aviso de atualização ------------------------- */
+
+.update-banner {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  background: var(--color-primary-dark);
+  color: #fff;
+  font-size: 0.85rem;
+  padding: var(--space-2) var(--space-4);
+}
+
+.update-banner .btn {
+  padding: var(--space-1) var(--space-3);
+  min-width: auto;
+}
+
 /* ---------------------------- Status bar ---------------------------- */
 
 .status-bar {
@@ -488,6 +510,26 @@ textarea {
 .entries-day-nav__hint {
   text-align: center;
   margin-bottom: var(--space-3);
+}
+
+.entries-pending-hint {
+  display: block;
+  width: 100%;
+  font: inherit;
+  font-size: 0.85rem;
+  text-align: center;
+  background: var(--color-warning-light);
+  color: var(--color-warning);
+  border: 1px solid #f0dfa0;
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
+  cursor: pointer;
+}
+
+.entries-pending-hint:hover,
+.entries-pending-hint:focus-visible {
+  background: #fbe9b8;
 }
 
 .table-wrapper {

@@ -50,6 +50,7 @@
     entriesDayPrev: document.getElementById('entriesDayPrev'),
     entriesDayNext: document.getElementById('entriesDayNext'),
     entriesDayLabel: document.getElementById('entriesDayLabel'),
+    entriesPendingElsewhereHint: document.getElementById('entriesPendingElsewhereHint'),
 
     editEntryForm: document.getElementById('editEntryForm'),
     editEntryId: document.getElementById('editEntryId'),
@@ -62,6 +63,8 @@
     cancelEditEntryButton: document.getElementById('cancelEditEntryButton'),
     statusBar: document.getElementById('statusBar'),
     connectionText: document.getElementById('connectionText'),
+    updateBanner: document.getElementById('updateBanner'),
+    updateBannerButton: document.getElementById('updateBannerButton'),
 
     configScreen: document.getElementById('configScreen'),
     loginScreen: document.getElementById('loginScreen'),
@@ -160,6 +163,8 @@
 
     els.entriesDayPrev.addEventListener('click', () => onEntriesDayNav(-1));
     els.entriesDayNext.addEventListener('click', () => onEntriesDayNav(1));
+
+    els.updateBannerButton.addEventListener('click', () => window.location.reload());
   }
 
   function showScreen(name) {
@@ -696,9 +701,7 @@
     const atual = entriesViewDate || hoje;
     const proximo = addDaysToDateStr(atual, delta);
     if (proximo > hoje || proximo < limite) return;
-    entriesViewDate = proximo === hoje ? null : proximo;
-    closeEditEntryForm();
-    renderEntries();
+    goToEntriesDay(proximo);
   }
 
   function updateEntriesDayNav(dateStr) {
@@ -709,11 +712,42 @@
     els.entriesDayPrev.disabled = dateStr <= limite;
   }
 
+  function goToEntriesDay(dateStr) {
+    entriesViewDate = dateStr === Timer.todayDateStr() ? null : dateStr;
+    closeEditEntryForm();
+    renderEntries();
+  }
+
+  // Se houver apontamento pendente de sincronização num dia diferente do que
+  // está sendo exibido, mostra um aviso clicável apontando pra lá — sem isso,
+  // quem abre o app direto na tela "Hoje" (vazia) não tem motivo pra imaginar
+  // que precisa navegar pelas setas pra achar o que falta sincronizar (foi
+  // exatamente essa confusão que gerou a dúvida de uma colaboradora em campo).
+  function updateEntriesPendingElsewhereHint(session, viewDate) {
+    const hintEl = els.entriesPendingElsewhereHint;
+    const outrosDias = Array.from(
+      new Set(DB.getUnsyncedEntries(session.id).map((e) => e.date).filter((d) => d && d !== viewDate))
+    ).sort();
+
+    if (outrosDias.length === 0) {
+      hintEl.classList.add('hidden');
+      hintEl.onclick = null;
+      return;
+    }
+
+    const alvo = outrosDias[outrosDias.length - 1];
+    const extra = outrosDias.length > 1 ? ` (e mais ${outrosDias.length - 1} dia(s))` : '';
+    hintEl.textContent = `⚠ Há apontamento(s) pendente(s) de sincronização em outro dia. Toque aqui para ver ${formatDiaLabel(alvo)}${extra}.`;
+    hintEl.classList.remove('hidden');
+    hintEl.onclick = () => goToEntriesDay(alvo);
+  }
+
   function renderEntries() {
     const session = DB.getSession();
     if (!session) return;
     const viewDate = entriesViewDate || Timer.todayDateStr();
     updateEntriesDayNav(viewDate);
+    updateEntriesPendingElsewhereHint(session, viewDate);
     const entries = DB.getEntriesByEmployeeAndDate(session.id, viewDate).sort((a, b) =>
       (a.startTime || '').localeCompare(b.startTime || '')
     );
@@ -866,13 +900,35 @@
   }
 
   function registerServiceWorker() {
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').catch((err) => {
+    if (!('serviceWorker' in navigator)) return;
+    window.addEventListener('load', () => {
+      navigator.serviceWorker
+        .register('./sw.js')
+        .then((registration) => {
+          // Uma aba deixada aberta por dias (comum em campo) nunca percebe
+          // sozinha que existe uma versão nova do app — o navegador só
+          // reconfere o sw.js em certos momentos de navegação, não com a
+          // aba já aberta parada. Sem isso, quem nunca fecha a aba fica
+          // preso numa versão antiga do app indefinidamente.
+          setInterval(() => registration.update().catch(() => {}), 30 * 60 * 1000);
+
+          registration.addEventListener('updatefound', () => {
+            const novoWorker = registration.installing;
+            if (!novoWorker) return;
+            novoWorker.addEventListener('statechange', () => {
+              // "installed" com um controller já ativo = havia uma versão
+              // anterior rodando, ou seja, isto é uma atualização (não a
+              // primeira instalação do service worker).
+              if (novoWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                els.updateBanner.classList.remove('hidden');
+              }
+            });
+          });
+        })
+        .catch((err) => {
           console.warn('[app] Falha ao registrar o service worker:', err);
         });
-      });
-    }
+    });
   }
 
   document.addEventListener('DOMContentLoaded', init);

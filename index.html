@@ -16,6 +16,12 @@
 </head>
 <body>
 
+  <!-- Aviso de nova versão do app disponível (service worker atualizado) -->
+  <div id="updateBanner" class="update-banner hidden" role="status">
+    <span>Uma nova versão do app está disponível.</span>
+    <button type="button" id="updateBannerButton" class="btn btn--small btn--start">Atualizar agora</button>
+  </div>
+
   <!-- Barra de status de conexão / avisos -->
   <div id="statusBar" class="status-bar" role="status" aria-live="polite">
     <span id="connectionIndicator" class="connection-indicator">
@@ -161,11 +167,14 @@
         </div>
 
         <div class="entries-day-nav">
-          <button type="button" id="entriesDayPrev" class="entries-day-nav__btn" aria-label="Dia anterior">‹</button>
+          <button type="button" id="entriesDayPrev" class="entries-day-nav__btn" aria-label="Ver dia anterior">‹</button>
           <span id="entriesDayLabel" class="entries-day-nav__label">Hoje</span>
-          <button type="button" id="entriesDayNext" class="entries-day-nav__btn" aria-label="Próximo dia" disabled>›</button>
+          <button type="button" id="entriesDayNext" class="entries-day-nav__btn" aria-label="Ver próximo dia" disabled>›</button>
         </div>
-        <p class="field-hint entries-day-nav__hint">É possível corrigir apontamentos dos últimos 30 dias.</p>
+        <p class="field-hint entries-day-nav__hint">
+          Esqueceu de apontar em outro dia? Use as setas <strong>‹ ›</strong> acima para ver e corrigir apontamentos de até 30 dias atrás.
+        </p>
+        <button type="button" id="entriesPendingElsewhereHint" class="entries-pending-hint hidden"></button>
 
         <form id="editEntryForm" class="edit-entry-form hidden">
           <h3>Editar apontamento</h3>

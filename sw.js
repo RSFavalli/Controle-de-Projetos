@@ -12,7 +12,7 @@
  * ------------------------------------------------------------------
  */
 
-const CACHE_NAME = 'timesheet-cache-v2';
+const CACHE_NAME = 'timesheet-cache-v3';
 
 const APP_SHELL_FILES = [
   './',
