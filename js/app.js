@@ -51,9 +51,12 @@
     entriesDayNext: document.getElementById('entriesDayNext'),
     entriesDayLabel: document.getElementById('entriesDayLabel'),
     entriesPendingElsewhereHint: document.getElementById('entriesPendingElsewhereHint'),
+    addEntryButton: document.getElementById('addEntryButton'),
 
     editEntryForm: document.getElementById('editEntryForm'),
+    editEntryFormTitle: document.getElementById('editEntryFormTitle'),
     editEntryId: document.getElementById('editEntryId'),
+    editEntryDate: document.getElementById('editEntryDate'),
     editEntryClient: document.getElementById('editEntryClient'),
     editEntryProject: document.getElementById('editEntryProject'),
     editEntryActivity: document.getElementById('editEntryActivity'),
@@ -131,7 +134,7 @@
       enterApp(session);
       if (inMemorySenha) {
         syncData(session.email, inMemorySenha, { silent: true });
-        syncEntries({ silent: true });
+        syncEntries({ silent: true, pull: true });
       }
     } else {
       showScreen('login');
@@ -159,6 +162,9 @@
     els.cancelEditEntryButton.addEventListener('click', closeEditEntryForm);
     els.editEntryClient.addEventListener('change', () => {
       populateEditProjectSelect(els.editEntryClient.value);
+    });
+    els.addEntryButton.addEventListener('click', () => {
+      openAddEntryForm(entriesViewDate || Timer.todayDateStr());
     });
 
     els.entriesDayPrev.addEventListener('click', () => onEntriesDayNav(-1));
@@ -235,7 +241,7 @@
       els.loginPassword.value = '';
       enterApp(profile);
       syncData(email, senha, { silent: true });
-      syncEntries({ silent: true });
+      syncEntries({ silent: true, pull: true });
       return;
     } catch (err) {
       if (!err.isNetworkError) {
@@ -287,7 +293,7 @@
     if (!session) return;
     if (inMemorySenha) {
       await syncData(session.email, inMemorySenha);
-      await syncEntries();
+      await syncEntries({ pull: true });
     } else {
       showScreen('reauth');
       els.reauthPassword.focus();
@@ -306,7 +312,7 @@
       els.reauthPassword.value = '';
       showScreen('app');
       await syncData(session.email, senha);
-      await syncEntries();
+      await syncEntries({ pull: true });
     } catch (err) {
       toast(err.isNetworkError ? 'Sem conexão. Tente novamente quando estiver online.' : err.message, 'error');
     }
@@ -341,26 +347,49 @@
 
   /* ------------------------ Sincronização de apontamentos ------------------------ */
 
+  // opts.pull: além de enviar o que está pendente, busca de volta os
+  // apontamentos do próprio colaborador (de qualquer aparelho) e mescla
+  // localmente — sem isso, quem usa celular e computador no mesmo dia vê uma
+  // lista incompleta/diferente em cada um, já que cada aparelho só enxerga o
+  // que ele mesmo registrou. Só usado nos pontos "de virada" (abrir o app,
+  // logar, reautenticar, sincronizar manualmente, voltar a ficar online) —
+  // não em toda ação isolada (iniciar/encerrar/editar), pra não buscar o
+  // período inteiro de novo a cada clique.
   async function syncEntries(opts = {}) {
     const session = DB.getSession();
     if (!session || !inMemorySenha) return;
 
     const pending = DB.getUnsyncedEntries(session.id);
     const deletedIds = DB.getPendingDeletes();
-    if (pending.length === 0 && deletedIds.length === 0) {
+    const temPendente = pending.length > 0 || deletedIds.length > 0;
+
+    if (!temPendente && !opts.pull) {
       if (!opts.silent) toast('Nenhum apontamento pendente de sincronização.', 'success');
       updateEntriesSyncStatusUi();
       return;
     }
 
     try {
-      await Api.syncApontamentos(session.email, inMemorySenha, pending, deletedIds);
-      const now = new Date().toISOString();
-      DB.markEntriesSynced(pending.map((e) => e.id), now);
-      DB.clearPendingDeletes(deletedIds);
-      DB.setLastEntriesSync(now);
+      if (temPendente) {
+        await Api.syncApontamentos(session.email, inMemorySenha, pending, deletedIds);
+        DB.markEntriesSynced(pending.map((e) => e.id), new Date().toISOString());
+        DB.clearPendingDeletes(deletedIds);
+      }
+
+      if (opts.pull) {
+        await pullMeusApontamentos(session);
+      }
+
+      // Registra "sincronizado" tanto ao enviar pendentes quanto ao só puxar
+      // do servidor — do contrário, um pull sem nada pendente pra enviar
+      // deixava o status preso em "Ainda não sincronizado" mesmo tendo
+      // acabado de falar com o servidor com sucesso.
+      DB.setLastEntriesSync(new Date().toISOString());
       updateEntriesSyncStatusUi();
-      if (!opts.silent) toast(`${pending.length} apontamento(s) sincronizado(s).`, 'success');
+      renderEntries();
+      if (!opts.silent) {
+        toast(temPendente ? `${pending.length} apontamento(s) sincronizado(s).` : 'Apontamentos atualizados.', 'success');
+      }
     } catch (err) {
       updateEntriesSyncStatusUi();
       if (!opts.silent) {
@@ -370,6 +399,18 @@
         );
       }
     }
+  }
+
+  async function pullMeusApontamentos(session) {
+    const hoje = Timer.todayDateStr();
+    const desde = addDaysToDateStr(hoje, -ENTRIES_DAYS_BACK);
+    const doServidor = await Api.listMeusApontamentos(session.email, inMemorySenha, desde, hoje);
+    // Não mexe no apontamento que este aparelho tem ativo agora — evita
+    // truncar o startTimestamp (o servidor só guarda HH:MM, sem segundos) de
+    // um cronômetro que está rodando ao vivo nesta mesma aba.
+    const ativo = DB.getActiveTimer();
+    const ativoId = ativo ? ativo.entryId : null;
+    DB.upsertEntriesFromServer(doServidor.filter((e) => e.id !== ativoId));
   }
 
   function updateEntriesSyncStatusUi() {
@@ -577,7 +618,9 @@
   }
 
   function openEditEntryForm(entry) {
+    els.editEntryFormTitle.textContent = 'Editar apontamento';
     els.editEntryId.value = entry.id;
+    els.editEntryDate.value = entry.date;
     populateEditClientSelect(entry.clientId);
     populateEditProjectSelect(entry.clientId, entry.projectId);
 
@@ -593,6 +636,28 @@
     els.editEntryForm.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
+  // Reaproveita o mesmo formulário de edição para lançar um apontamento
+  // esquecido num dia que não tem nenhum registro ainda — sem isso, só dava
+  // pra corrigir apontamentos já existentes, nunca criar um que nunca chegou
+  // a ser feito.
+  function openAddEntryForm(dateStr) {
+    els.editEntryFormTitle.textContent = `Adicionar apontamento — ${formatDiaLabel(dateStr)}`;
+    els.editEntryId.value = '';
+    els.editEntryDate.value = dateStr;
+    populateEditClientSelect('');
+    populateEditProjectSelect('');
+
+    els.editEntryActivity.innerHTML = '';
+    fillActivityOptions(els.editEntryActivity);
+
+    els.editEntryStart.value = '';
+    els.editEntryEnd.value = '';
+    els.editEntryObservations.value = '';
+
+    els.editEntryForm.classList.remove('hidden');
+    els.editEntryForm.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
   function closeEditEntryForm() {
     els.editEntryForm.classList.add('hidden');
     els.editEntryForm.reset();
@@ -601,9 +666,10 @@
   function onEditEntrySubmit(e) {
     e.preventDefault();
     const entryId = els.editEntryId.value;
+    const isNovo = !entryId;
     const entries = DB.getEntries();
-    const entry = entries.find((en) => en.id === entryId);
-    if (!entry) {
+    let entry = isNovo ? null : entries.find((en) => en.id === entryId);
+    if (!isNovo && !entry) {
       closeEditEntryForm();
       return;
     }
@@ -622,8 +688,9 @@
     const cliente = DB.getCachedClientes().find((c) => c.id === clientId);
     const projeto = DB.getCachedProjetos().find((p) => p.id === projectId);
     const activity = window.APP_DATA.ACTIVITIES.find((a) => a.id === activityId);
+    const dateStr = isNovo ? els.editEntryDate.value : entry.date;
 
-    const [y, m, d] = entry.date.split('-').map(Number);
+    const [y, m, d] = dateStr.split('-').map(Number);
     const [sh, sm] = startTimeStr.split(':').map(Number);
     const [eh, em] = endTimeStr.split(':').map(Number);
     const startDate = new Date(y, m - 1, d, sh, sm, 0, 0);
@@ -632,6 +699,19 @@
     if (endDate <= startDate) {
       toast('O horário de fim deve ser depois do horário de início.', 'error');
       return;
+    }
+
+    const agora = new Date().toISOString();
+    if (isNovo) {
+      const session = DB.getSession();
+      entry = {
+        id: DB.generateId(),
+        employeeId: session.id,
+        employeeName: session.nome,
+        date: dateStr,
+        status: 'concluido',
+        createdAt: agora,
+      };
     }
 
     entry.clientId = cliente.id;
@@ -646,12 +726,12 @@
     entry.endTimestamp = endDate.getTime();
     entry.durationMinutes = Math.round((endDate - startDate) / 60000);
     entry.observations = els.editEntryObservations.value;
-    entry.updatedAt = new Date().toISOString();
+    entry.updatedAt = agora;
 
     DB.saveEntry(entry);
     closeEditEntryForm();
     refreshAppUi();
-    toast('Apontamento atualizado com sucesso.', 'success');
+    toast(isNovo ? 'Apontamento adicionado com sucesso.' : 'Apontamento atualizado com sucesso.', 'success');
     syncEntries({ silent: true });
   }
 
@@ -894,7 +974,7 @@
       const session = DB.getSession();
       if (session && inMemorySenha) {
         syncData(session.email, inMemorySenha, { silent: true });
-        syncEntries({ silent: true });
+        syncEntries({ silent: true, pull: true });
       }
     }
   }

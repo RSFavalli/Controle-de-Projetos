@@ -134,6 +134,38 @@ function markEntriesSynced(ids, timestamp) {
   dbWrite(DB_KEYS.ENTRIES, entries);
 }
 
+function combineDateAndTime(dateStr, timeStr) {
+  if (!dateStr || !timeStr) return null;
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const [hh, mm] = timeStr.split(':').map(Number);
+  return new Date(y, m - 1, d, hh, mm, 0, 0).getTime();
+}
+
+/* Mescla apontamentos vindos do servidor (do próprio colaborador, de
+ * qualquer aparelho) na lista local — sem isso, cada aparelho só enxerga o
+ * que ele mesmo registrou, e quem aponta pelo celular de manhã e pelo
+ * computador à tarde vê uma lista incompleta/diferente em cada um. Nunca
+ * sobrescreve uma edição local ainda não sincronizada (evita perder uma
+ * correção que só ainda não chegou ao servidor) e nunca remove localmente o
+ * que o servidor não devolveu (evita apagar um apontamento novo que ainda
+ * não foi sincronizado por não estar, claro, no que veio do servidor). */
+function upsertEntriesFromServer(serverEntries) {
+  const locais = getEntries();
+  const porId = new Map(locais.map((e) => [e.id, e]));
+  serverEntries.forEach((remoto) => {
+    const local = porId.get(remoto.id);
+    const localPendente = local && (!local.syncedAt || new Date(local.updatedAt) > new Date(local.syncedAt));
+    if (localPendente) return;
+    porId.set(remoto.id, {
+      ...remoto,
+      startTimestamp: combineDateAndTime(remoto.date, remoto.startTime),
+      endTimestamp: remoto.endTime ? combineDateAndTime(remoto.date, remoto.endTime) : null,
+      syncedAt: remoto.updatedAt || new Date().toISOString(),
+    });
+  });
+  dbWrite(DB_KEYS.ENTRIES, Array.from(porId.values()));
+}
+
 function getPendingDeletes() {
   return dbRead(DB_KEYS.PENDING_DELETES, []);
 }
@@ -280,6 +312,7 @@ window.DB = {
 
   getUnsyncedEntries,
   markEntriesSynced,
+  upsertEntriesFromServer,
   getPendingDeletes,
   addPendingDelete,
   clearPendingDeletes,

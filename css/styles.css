@@ -532,6 +532,12 @@ textarea {
   background: #fbe9b8;
 }
 
+.entries-add-btn {
+  display: block;
+  width: 100%;
+  margin-bottom: var(--space-3);
+}
+
 .table-wrapper {
   overflow-x: auto;
 }

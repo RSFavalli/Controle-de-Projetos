@@ -71,6 +71,8 @@ const Api = (() => {
     listProjetos: (email, senha) => call('listProjetos', { email, senha }),
     syncApontamentos: (email, senha, entries, deletedIds) =>
       call('syncApontamentos', { email, senha, entries, deletedIds }),
+    listMeusApontamentos: (email, senha, desde, ate) =>
+      call('listMeusApontamentos', { email, senha, desde, ate }),
   };
 })();
 
