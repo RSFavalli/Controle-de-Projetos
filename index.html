@@ -53,20 +53,14 @@
 
     <div id="toastArea" class="toast-area" aria-live="assertive"></div>
 
-    <!-- ------------------------- Tela de configuração da API ------------------------- -->
-    <section id="configScreen" class="card auth-card hidden">
-      <h2>Conectar ao servidor</h2>
+    <!-- ------------------------- Tela de seleção de time ------------------------- -->
+    <section id="teamScreen" class="card auth-card hidden">
+      <h2>Selecione o time</h2>
       <p class="muted">
-        Cole aqui a URL da API informada pelo administrador (a mesma usada no Dashboard Admin).
+        Escolha o time para continuar. Cada time tem sua própria base de dados — os registros nunca se misturam entre times.
       </p>
-      <form id="configForm" class="stacked-form">
-        <div class="field">
-          <label for="apiUrlInput">URL da API</label>
-          <input type="url" id="apiUrlInput" placeholder="https://script.google.com/macros/s/XXXX/exec" required />
-        </div>
-        <button type="submit" class="btn btn--start">Salvar e continuar</button>
-      </form>
-      <p id="configTestResult" class="config-test-result"></p>
+      <div id="teamList" class="stacked-form"></div>
+      <p id="teamTestResult" class="config-test-result"></p>
     </section>
 
     <!-- ------------------------------- Tela de login ------------------------------- -->
@@ -85,7 +79,7 @@
         <button type="submit" class="btn btn--start">Entrar</button>
       </form>
       <p id="loginHint" class="muted login-hint"></p>
-      <button id="changeApiUrlButton" class="link-button">Trocar URL da API</button>
+      <button id="changeTeamButton" class="link-button">Trocar de time</button>
     </section>
 
     <!-- --------------------------- Reautenticação p/ sincronizar --------------------------- -->
@@ -246,6 +240,7 @@
   </footer>
 
   <!-- Dados mestres e camada de persistência -->
+  <script src="js/teams.js"></script>
   <script src="js/data.js"></script>
   <script src="js/db.js"></script>
   <script src="js/api.js"></script>

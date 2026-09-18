@@ -21,8 +21,10 @@
 
 (function () {
   const END_OF_DAY_HOUR = 18; // a partir dessa hora, avisa sobre atividade aberta
+  const TEAM_STORAGE_KEY = 'ts_team_id'; // não escopado por time — é a "ponteira" de qual time está ativo
 
   let inMemorySenha = null; // só dura enquanto a aba estiver aberta
+  let currentTeam = null;
   let alertsIntervalId = null;
 
   // Dia sendo exibido/editado na lista de apontamentos — null = hoje. Dá pra
@@ -69,20 +71,19 @@
     updateBanner: document.getElementById('updateBanner'),
     updateBannerButton: document.getElementById('updateBannerButton'),
 
-    configScreen: document.getElementById('configScreen'),
+    teamScreen: document.getElementById('teamScreen'),
     loginScreen: document.getElementById('loginScreen'),
     reauthScreen: document.getElementById('reauthScreen'),
     appScreen: document.getElementById('appScreen'),
 
-    configForm: document.getElementById('configForm'),
-    apiUrlInput: document.getElementById('apiUrlInput'),
-    configTestResult: document.getElementById('configTestResult'),
+    teamList: document.getElementById('teamList'),
+    teamTestResult: document.getElementById('teamTestResult'),
 
     loginForm: document.getElementById('loginForm'),
     loginEmail: document.getElementById('loginEmail'),
     loginPassword: document.getElementById('loginPassword'),
     loginHint: document.getElementById('loginHint'),
-    changeApiUrlButton: document.getElementById('changeApiUrlButton'),
+    changeTeamButton: document.getElementById('changeTeamButton'),
 
     reauthForm: document.getElementById('reauthForm'),
     reauthPassword: document.getElementById('reauthPassword'),
@@ -100,8 +101,6 @@
   /* ---------------------------- Setup inicial ---------------------------- */
 
   function init() {
-    DB.ensureSeeded();
-    populateActivities();
     wireHandlers();
 
     window.addEventListener('online', onConnectivityChange);
@@ -118,10 +117,21 @@
 
     registerServiceWorker();
 
-    if (!Api.getBaseUrl()) {
-      showScreen('config');
+    // Migração única de quem já usava o app antes deste projeto virar
+    // "unificado" (mesma URL, era só a equipe de Pesquisa Agrícola) — tem
+    // que rodar ANTES de resolveActiveTeam(), senão o app não acha nada
+    // salvo e mostra a tela de seleção de time pra quem já estava logado.
+    DB.migrateLegacyUnscopedDataIfNeeded();
+
+    const team = resolveActiveTeam();
+    if (!team) {
+      renderTeamList();
+      showScreen('team');
       return;
     }
+
+    DB.ensureSeeded();
+    populateActivities();
 
     const session = DB.getSession();
     if (session) {
@@ -141,12 +151,89 @@
     }
   }
 
+  /* -------------------------------- Time ativo ------------------------------- */
+
+  // Lê o time salvo (se houver) e deixa tudo pronto para usá-lo: Api apontando
+  // para a URL certa, DB lendo/gravando na "gaveta" desse time e ACTIVITIES
+  // com a lista fixa deste time. Retorna null se nenhum time válido está
+  // salvo ainda (primeira vez neste aparelho, ou id desatualizado).
+  function resolveActiveTeam() {
+    const teamId = localStorage.getItem(TEAM_STORAGE_KEY);
+    if (!teamId) return null;
+    const team = window.TEAMS_DATA.getTeamById(teamId);
+    if (!team) return null;
+    activateTeam(team);
+    return team;
+  }
+
+  function activateTeam(team) {
+    currentTeam = team;
+    Api.setBaseUrl(team.apiUrl);
+    DB.setActiveTeam(team.id);
+    window.APP_DATA = {
+      ACTIVITIES: window.TEAMS_DATA.buildActivities(team),
+      slugify: window.TEAMS_DATA.slugify,
+    };
+  }
+
+  function renderTeamList() {
+    els.teamList.innerHTML = '';
+    window.TEAMS_DATA.TEAMS.forEach((team) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn--start';
+      btn.textContent = team.nome;
+      btn.addEventListener('click', () => onTeamSelect(team.id));
+      els.teamList.appendChild(btn);
+    });
+    els.teamTestResult.textContent = '';
+    els.teamTestResult.className = 'config-test-result';
+  }
+
+  async function onTeamSelect(teamId) {
+    const team = window.TEAMS_DATA.getTeamById(teamId);
+    if (!team) return;
+    els.teamTestResult.textContent = 'Conectando...';
+    els.teamTestResult.className = 'config-test-result';
+
+    // Mesmo sem conseguir confirmar a conexão agora, deixa continuar — quem
+    // está em campo sem internet ainda precisa conseguir escolher o time e
+    // usar o app offline (sincroniza quando a conexão voltar).
+    try {
+      await Api.ping(team.apiUrl);
+      els.teamTestResult.textContent = `Conectado ao time ${team.nome}.`;
+      els.teamTestResult.classList.add('ok');
+    } catch (err) {
+      els.teamTestResult.textContent = `Não foi possível confirmar a conexão agora (${err.message}). Você pode continuar offline.`;
+      els.teamTestResult.classList.add('error');
+    }
+
+    localStorage.setItem(TEAM_STORAGE_KEY, team.id);
+    activateTeam(team);
+    DB.ensureSeeded();
+    populateActivities();
+
+    setTimeout(() => {
+      const session = DB.getSession();
+      if (session) {
+        const senhaSalva = DB.getSenhaDispositivo();
+        if (senhaSalva) inMemorySenha = senhaSalva;
+        enterApp(session);
+        if (inMemorySenha) {
+          syncData(session.email, inMemorySenha, { silent: true });
+          syncEntries({ silent: true, pull: true });
+        }
+      } else {
+        showScreen('login');
+      }
+    }, 400);
+  }
+
   function wireHandlers() {
-    els.configForm.addEventListener('submit', onConfigSubmit);
     els.loginForm.addEventListener('submit', onLoginSubmit);
-    els.changeApiUrlButton.addEventListener('click', () => {
-      showScreen('config');
-      els.apiUrlInput.value = Api.getBaseUrl();
+    els.changeTeamButton.addEventListener('click', () => {
+      renderTeamList();
+      showScreen('team');
     });
     els.reauthForm.addEventListener('submit', onReauthSubmit);
     els.cancelReauthButton.addEventListener('click', () => showScreen('app'));
@@ -174,7 +261,7 @@
   }
 
   function showScreen(name) {
-    els.configScreen.classList.toggle('hidden', name !== 'config');
+    els.teamScreen.classList.toggle('hidden', name !== 'team');
     els.loginScreen.classList.toggle('hidden', name !== 'login');
     els.reauthScreen.classList.toggle('hidden', name !== 'reauth');
     els.appScreen.classList.toggle('hidden', name !== 'app');
@@ -199,29 +286,6 @@
       opt.textContent = `${activity.order}. ${activity.name}`;
       selectEl.appendChild(opt);
     });
-  }
-
-  /* ------------------------------ Configuração da API ----------------------------- */
-
-  async function onConfigSubmit(e) {
-    e.preventDefault();
-    const url = els.apiUrlInput.value.trim();
-    els.configTestResult.textContent = 'Testando conexão...';
-    els.configTestResult.className = 'config-test-result';
-    try {
-      await Api.ping(url);
-      Api.setBaseUrl(url);
-      els.configTestResult.textContent = 'Conectado com sucesso!';
-      els.configTestResult.classList.add('ok');
-      setTimeout(() => {
-        const session = DB.getSession();
-        showScreen(session ? 'app' : 'login');
-        if (session) refreshAppUi();
-      }, 500);
-    } catch (err) {
-      els.configTestResult.textContent = `Não foi possível conectar: ${err.message}. Se estiver offline, você pode configurar depois que tiver internet.`;
-      els.configTestResult.classList.add('error');
-    }
   }
 
   /* --------------------------------- Login --------------------------------- */

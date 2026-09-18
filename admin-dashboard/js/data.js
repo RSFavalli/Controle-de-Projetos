@@ -1,21 +1,21 @@
 /**
  * data.js
  * ------------------------------------------------------------------
- * Lista fixa das 6 atividades do app de campo — cópia de js/data.js
- * (raiz do projeto), só para o Dashboard rotular o gráfico de horas
- * por atividade. As atividades não são editáveis (nem pelo admin); se
- * a lista mudar um dia, atualize as duas cópias.
+ * Lista fixa das 6 macroatividades do app de campo — cópia de
+ * js/data.js (raiz do projeto), só para o Dashboard rotular o gráfico
+ * de horas por atividade. As atividades não são editáveis (nem pelo
+ * admin); se a lista mudar um dia, atualize as duas cópias.
  * ------------------------------------------------------------------
  */
 
-// Ordem cronológica fixa do processo de trabalho.
+// Lista fixa de macroatividades da equipe de pesquisa agrícola.
 const ACTIVITY_NAMES = [
-  'Desenvolver metodologia',
-  'Preparar material',
-  'Coletar dados',
-  'Tratar dados',
-  'Analisar dados',
-  'Apresentar resultados',
+  'Desenvolver Metodologia',
+  'Preparar Material',
+  'Coletar Dados',
+  'Tratar Dados',
+  'Analisar Dados',
+  'Apresentar Resultados',
 ];
 
 function slugify(text) {

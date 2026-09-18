@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Timesheet — Dashboard Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" />
   <link rel="stylesheet" href="css/styles.css" />
   <script>
     // Aplica o tema salvo antes do primeiro paint, pra não piscar claro→escuro.
@@ -40,31 +43,73 @@
         </svg>
       </button>
       <div id="sessionInfo" class="admin-header__session hidden">
+        <span id="loadingStatus" class="loading-status hidden">
+          <span class="loading-spinner" aria-hidden="true"></span>
+          Carregando dados…
+        </span>
         <span id="sessionUserName"></span>
         <button id="logoutButton" class="btn btn--ghost btn--small">Sair</button>
       </div>
     </div>
   </header>
 
-  <main class="admin-main">
+  <div id="loadingBar" class="loading-bar hidden" aria-hidden="true"></div>
+
+  <div class="admin-shell">
+
+    <aside class="admin-sidebar hidden" id="adminSidebar">
+      <nav class="tabs" role="tablist">
+        <button class="tab-button is-active" data-tab="clientes" role="tab">
+          <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 20V6.8c0-.8.6-1.5 1.4-1.7l6-1.5a1.7 1.7 0 0 1 2.2 1.6V20M4 20h16M9 20v-4.2c0-.5.4-.8.8-.8h1.4c.4 0 .8.3.8.8V20M14 20V9.5c0-.5.4-.9.9-.9h3.2c.5 0 .9.4.9.9V20" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          Clientes
+        </button>
+        <button class="tab-button" data-tab="projetos" role="tab">
+          <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 5.5c0-.6.4-1 1-1h4l1.6 2h8.4c.6 0 1 .4 1 1v10.9c0 .6-.4 1-1 1H5c-.6 0-1-.4-1-1V5.5Z" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          Projetos
+        </button>
+        <button class="tab-button" data-tab="colaboradores" role="tab">
+          <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="9" cy="8" r="3.2" /><path d="M3.5 19c.6-3.2 3-5 5.5-5s4.9 1.8 5.5 5M15.5 6.8a3 3 0 0 1 0 5.9M18 13.6c2.1.4 3.7 2 4.2 4.9" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          Colaboradores
+        </button>
+        <button class="tab-button" data-tab="apontamentos" role="tab">
+          <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          Apontamentos
+        </button>
+        <button class="tab-button" data-tab="equipe" role="tab">
+          <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 20c.5-3.4 3-5.3 5.5-5.3S13.5 16.6 14 20M8.5 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM14.5 9.5c1.6.3 2.8 1.7 3.1 3.6M15 6.3a2.4 2.4 0 1 1 0 4.7" stroke-linecap="round" stroke-linejoin="round" /><path d="M14.5 20c.4-2.8 2-4.3 4-4.3s3.4 1.4 4 3.9" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          Equipe
+        </button>
+        <button class="tab-button" data-tab="financeira" role="tab" id="financeiraTabButton">
+          <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 3.5v17M16.5 6.8c0-1.5-1.6-2.6-4-2.6-2.7 0-4.5 1.3-4.5 3.1 0 4 8.5 1.9 8.5 5.9 0 1.9-1.9 3.2-4.5 3.2-2.4 0-4-1-4-2.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          Financeira
+        </button>
+        <button class="tab-button" data-tab="estrategia" role="tab" id="estrategiaTabButton">
+          <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="0.9" fill="currentColor" stroke="none" /></svg>
+          Estratégia
+        </button>
+      </nav>
+    </aside>
+
+    <main class="admin-main">
 
     <div id="toastArea" class="toast-area" aria-live="assertive"></div>
 
-    <!-- ------------------------- Tela de configuração da API ------------------------- -->
-    <section id="configScreen" class="card auth-card hidden">
-      <h2>Conectar ao backend</h2>
+    <!-- Movido via JS para dentro da aba ativa enquanto ela carrega dados —
+         ver beginLoading/endLoading em js/app.js. -->
+    <div id="tabLoadingOverlay" class="tab-loading-overlay hidden" aria-hidden="true">
+      <span class="loading-spinner loading-spinner--lg"></span>
+      <span>Carregando…</span>
+    </div>
+
+    <!-- ------------------------- Tela de seleção de time ------------------------- -->
+    <section id="teamScreen" class="card auth-card hidden">
+      <h2>Selecione o time</h2>
       <p class="muted">
-        Cole aqui a URL do Google Apps Script (Web App) publicada seguindo o guia
-        <code>backend/SETUP.md</code>. Ela termina em <code>/exec</code>.
+        Escolha qual time você quer administrar. Cada time tem sua própria base de dados —
+        os registros nunca se misturam entre times.
       </p>
-      <form id="configForm" class="stacked-form">
-        <div class="field">
-          <label for="apiUrlInput">URL da API</label>
-          <input type="url" id="apiUrlInput" placeholder="https://script.google.com/macros/s/XXXX/exec" required />
-        </div>
-        <button type="submit" class="btn btn--start">Salvar e continuar</button>
-      </form>
-      <p id="configTestResult" class="config-test-result"></p>
+      <div id="teamList" class="stacked-form"></div>
+      <p id="teamTestResult" class="config-test-result"></p>
     </section>
 
     <!-- ------------------------------- Tela de login ------------------------------- -->
@@ -82,44 +127,44 @@
         </div>
         <button type="submit" class="btn btn--start">Entrar</button>
       </form>
-      <button id="changeApiUrlButton" class="link-button">Trocar URL da API</button>
+      <button id="changeTeamButton" class="link-button">Trocar de time</button>
     </section>
 
     <!-- ------------------------------ Dashboard ------------------------------ -->
     <section id="dashboardScreen" class="hidden">
 
       <div class="tabs-bar">
-        <nav class="tabs" role="tablist">
-          <button class="tab-button is-active" data-tab="clientes" role="tab">
-            <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 20V6.8c0-.8.6-1.5 1.4-1.7l6-1.5a1.7 1.7 0 0 1 2.2 1.6V20M4 20h16M9 20v-4.2c0-.5.4-.8.8-.8h1.4c.4 0 .8.3.8.8V20M14 20V9.5c0-.5.4-.9.9-.9h3.2c.5 0 .9.4.9.9V20" stroke-linecap="round" stroke-linejoin="round" /></svg>
-            Clientes
-          </button>
-          <button class="tab-button" data-tab="projetos" role="tab">
-            <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 5.5c0-.6.4-1 1-1h4l1.6 2h8.4c.6 0 1 .4 1 1v10.9c0 .6-.4 1-1 1H5c-.6 0-1-.4-1-1V5.5Z" stroke-linecap="round" stroke-linejoin="round" /></svg>
-            Projetos
-          </button>
-          <button class="tab-button" data-tab="colaboradores" role="tab">
-            <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="9" cy="8" r="3.2" /><path d="M3.5 19c.6-3.2 3-5 5.5-5s4.9 1.8 5.5 5M15.5 6.8a3 3 0 0 1 0 5.9M18 13.6c2.1.4 3.7 2 4.2 4.9" stroke-linecap="round" stroke-linejoin="round" /></svg>
-            Colaboradores
-          </button>
-          <button class="tab-button" data-tab="apontamentos" role="tab">
-            <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" stroke-linecap="round" stroke-linejoin="round" /></svg>
-            Apontamentos
-          </button>
-          <button class="tab-button" data-tab="equipe" role="tab">
-            <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 20c.5-3.4 3-5.3 5.5-5.3S13.5 16.6 14 20M8.5 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM14.5 9.5c1.6.3 2.8 1.7 3.1 3.6M15 6.3a2.4 2.4 0 1 1 0 4.7" stroke-linecap="round" stroke-linejoin="round" /><path d="M14.5 20c.4-2.8 2-4.3 4-4.3s3.4 1.4 4 3.9" stroke-linecap="round" stroke-linejoin="round" /></svg>
-            Equipe
-          </button>
-          <button class="tab-button" data-tab="financeira" role="tab" id="financeiraTabButton">
-            <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 3.5v17M16.5 6.8c0-1.5-1.6-2.6-4-2.6-2.7 0-4.5 1.3-4.5 3.1 0 4 8.5 1.9 8.5 5.9 0 1.9-1.9 3.2-4.5 3.2-2.4 0-4-1-4-2.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
-            Financeira
-          </button>
-          <button class="tab-button" data-tab="estrategia" role="tab" id="estrategiaTabButton">
-            <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="0.9" fill="currentColor" stroke="none" /></svg>
-            Estratégia
-          </button>
-        </nav>
         <button type="button" class="btn btn--ghost btn--small no-print" id="exportPdfButton">Exportar PDF</button>
+        <button type="button" class="btn btn--ghost btn--small no-print" id="shareHtmlButton">Compartilhar em HTML</button>
+      </div>
+
+      <!-- Modal de seleção do que entra no arquivo HTML compartilhado — ver
+           Dashboard.openShareHtmlModal()/shareReportHtml() em js/app.js. -->
+      <div id="shareHtmlModal" class="modal-overlay hidden no-print">
+        <div class="modal-card">
+          <h3>Compartilhar em HTML</h3>
+          <p class="muted">Escolha o que vai entrar no arquivo.</p>
+
+          <div class="share-html-secoes">
+            <label><input type="checkbox" id="shareHtmlSecaoApontamentos" checked /> Apontamentos</label>
+            <label><input type="checkbox" id="shareHtmlSecaoEquipe" checked /> Equipe</label>
+            <label id="shareHtmlSecaoFinanceiroWrap"><input type="checkbox" id="shareHtmlSecaoFinanceiro" checked /> Financeira e Estratégia</label>
+          </div>
+
+          <div id="shareHtmlColaboradoresWrap">
+            <p class="muted" style="margin-top: var(--space-4);">Em "Horas apontadas por dia", incluir:</p>
+            <div class="share-html-colaboradores-actions">
+              <button type="button" class="link-button" id="shareHtmlColaboradoresTodos">Selecionar todos</button>
+              <button type="button" class="link-button" id="shareHtmlColaboradoresNenhum">Nenhum</button>
+            </div>
+            <div id="shareHtmlColaboradoresList" class="share-html-colaboradores-list"></div>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn btn--ghost btn--small" id="shareHtmlCancelButton">Cancelar</button>
+            <button type="button" class="btn btn--start btn--small" id="shareHtmlConfirmButton">Gerar HTML</button>
+          </div>
+        </div>
       </div>
 
       <!-- Só aparece na impressão/exportação em PDF — ver Dashboard.exportReportPdf() em js/app.js -->
@@ -244,7 +289,9 @@
           </div>
           <div class="field">
             <label for="colaboradorCargo">Cargo</label>
-            <input type="text" id="colaboradorCargo" placeholder="Ex.: Consultor Sênior (opcional)" />
+            <select id="colaboradorCargo">
+              <option value="">Sem cargo definido</option>
+            </select>
           </div>
           <div class="field">
             <label for="colaboradorDedicacaoDiaria">Dedicação diária (horas)</label>
@@ -357,26 +404,31 @@
               <button type="button" class="chart-zoom-btn" id="horasDiariasZoomIn" aria-label="Aumentar zoom">+</button>
             </div>
           </div>
-          <p id="horasDiariasEmptyState" class="empty-state hidden">Nenhum apontamento concluído neste mês para este colaborador.</p>
+          <!-- Envolvido num id próprio pra poder ser trocado, na exportação em
+               HTML, pelo conteúdo de TODOS os colaboradores — ver
+               Dashboard.buildTodosColaboradoresHorasDiariasHtml() em js/app.js. -->
+          <div id="horasDiariasSecaoConteudo">
+            <p id="horasDiariasEmptyState" class="empty-state hidden">Nenhum apontamento concluído neste mês para este colaborador.</p>
 
-          <p class="muted"><strong>Situação do dia</strong> — cor conforme as horas apontadas frente à dedicação diária (linha tracejada).</p>
-          <div class="chart-wrap">
-            <svg id="chartHorasDiariasStatus" height="260" viewBox="0 0 820 260" role="img" aria-label="Horas apontadas por dia, coloridas pela situação"></svg>
-          </div>
-          <div class="legend-row">
-            <span><i style="background: var(--status-good)"></i>Na meta ou acima</span>
-            <span><i style="background: var(--status-warning)"></i>Abaixo da meta</span>
-            <span><i style="background: var(--status-critical)"></i>Sem apontamento (dia útil)</span>
-            <span><i style="background: var(--weekend-band); border: 1px solid var(--color-border);"></i>Fim de semana</span>
-            <span><i style="background: var(--holiday-band); border: 1px solid var(--color-border);"></i>Feriado</span>
-            <span><i class="line"></i>Dedicação diária</span>
-          </div>
+            <p class="muted"><strong>Situação do dia</strong> — cor conforme as horas apontadas frente à dedicação diária (linha tracejada).</p>
+            <div class="chart-wrap">
+              <svg id="chartHorasDiariasStatus" height="260" viewBox="0 0 820 260" role="img" aria-label="Horas apontadas por dia, coloridas pela situação"></svg>
+            </div>
+            <div class="legend-row">
+              <span><i style="background: var(--status-good)"></i>Na meta ou acima</span>
+              <span><i style="background: var(--status-warning)"></i>Abaixo da meta</span>
+              <span><i style="background: var(--status-critical)"></i>Sem apontamento (dia útil)</span>
+              <span><i style="background: var(--weekend-band); border: 1px solid var(--color-border);"></i>Fim de semana</span>
+              <span><i style="background: var(--holiday-band); border: 1px solid var(--color-border);"></i>Feriado</span>
+              <span><i class="line"></i>Dedicação diária</span>
+            </div>
 
-          <p class="muted" style="margin-top: var(--space-4);"><strong>Composição por atividade</strong> — mesmo eixo, mostrando em que a pessoa trabalhou naquele dia.</p>
-          <div class="chart-wrap">
-            <svg id="chartHorasDiariasAtividade" height="260" viewBox="0 0 820 260" role="img" aria-label="Horas apontadas por dia, por atividade"></svg>
+            <p class="muted" style="margin-top: var(--space-4);"><strong>Composição por atividade</strong> — mesmo eixo, mostrando em que a pessoa trabalhou naquele dia.</p>
+            <div class="chart-wrap">
+              <svg id="chartHorasDiariasAtividade" height="260" viewBox="0 0 820 260" role="img" aria-label="Horas apontadas por dia, por atividade"></svg>
+            </div>
+            <div class="legend-row" id="legendHorasDiariasAtividade"></div>
           </div>
-          <div class="legend-row" id="legendHorasDiariasAtividade"></div>
         </div>
 
         <div class="apontamentos-secao">
@@ -545,7 +597,7 @@
           <div class="kpi">
             <span class="kpi__label">Colaboradores ativos</span>
             <span class="kpi__value" id="kpiColaboradoresAtivosValue">—</span>
-            <span class="kpi__sub">cadastrados como ativos hoje</span>
+            <span class="kpi__sub">ativos e obrigados a apontar</span>
           </div>
           <div class="kpi">
             <span class="kpi__label">Projetos executados no ano</span>
@@ -557,6 +609,13 @@
             <span class="kpi__value" id="kpiSobrecarregadosValue">—</span>
             <span class="kpi__sub">acima do teto saudável</span>
           </div>
+        </div>
+        <div class="field-note">
+          Estes números consideram só colaboradores ativos <strong>obrigados a apontar horas</strong> — quem está
+          marcado como isento (geralmente gerência/coordenação, no cadastro de Colaboradores) fica de fora da
+          capacidade, do consumido e da ocupação desta aba. Isso evita que a dedicação diária de quem raramente
+          aponta infle a capacidade sem nunca aparecer como "consumido". A aba Financeira continua somando o custo
+          de todo mundo, isento ou não — salário é despesa real independente de apontar horas.
         </div>
         <p class="muted" style="margin-top: var(--space-3);" id="equipeSobrecarregadosDetalhe"></p>
 
@@ -882,6 +941,7 @@
             <select id="relatorioMesSelect"></select>
             <button type="button" class="btn btn--ghost btn--small" id="relatorioVoltarButton">Voltar</button>
             <button type="button" class="btn btn--ghost btn--small" id="relatorioExportPdfButton">Exportar PDF</button>
+            <button type="button" class="btn btn--ghost btn--small" id="relatorioShareHtmlButton">Compartilhar em HTML</button>
           </div>
         </div>
 
@@ -982,6 +1042,8 @@
 
   </main>
 
+  </div>
+
   <footer class="admin-footer">
     <p class="admin-footer__title">Gestão de Pessoas — Agricef, Experimentação Agrícola</p>
     <p class="admin-footer__meta">Desenvolvido por Rafael de Souza Favalli · Julho de 2026 · última atualização em Agosto de 2026</p>
@@ -989,6 +1051,7 @@
     <p class="admin-footer__tech">Dados armazenados em uma planilha do Google Sheets, acessada via Google Apps Script. Veja <code>backend/SETUP.md</code> para detalhes.</p>
   </footer>
 
+  <script src="../js/teams.js"></script>
   <script src="js/data.js"></script>
   <script src="js/holidays.js"></script>
   <script src="js/api.js"></script>

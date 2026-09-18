@@ -21,6 +21,14 @@
  *   - um cache de verificador de senha por e-mail, que permite fazer
  *     login OFFLINE em um dispositivo onde essa pessoa já logou pelo
  *     menos uma vez online (veja js/app.js, função attemptLogin).
+ *
+ * Isolamento por time: como este projeto unificado atende mais de um
+ * time (cada um com seu próprio backend — veja js/teams.js), toda
+ * chave abaixo é prefixada com o id do time ativo (setActiveTeam(),
+ * chamado por js/app.js assim que o time é conhecido). Assim, dados de
+ * um time (sessão, apontamentos, cache de clientes/projetos etc.)
+ * nunca aparecem nem se misturam com os de outro no mesmo aparelho —
+ * trocar de time só troca qual "gaveta" do localStorage é lida.
  * ------------------------------------------------------------------
  */
 
@@ -37,9 +45,22 @@ const DB_KEYS = {
   SENHA_DISPOSITIVO: 'ts_senha_dispositivo',
 };
 
+// Id do time atualmente ativo — definido por DB.setActiveTeam() assim que
+// js/app.js resolve qual time este aparelho está usando. Enquanto for null
+// (app ainda na tela de seleção de time), as chaves não são prefixadas.
+let activeTeamId = null;
+
+function setActiveTeam(teamId) {
+  activeTeamId = teamId || null;
+}
+
+function scopedKey(key) {
+  return activeTeamId ? `${activeTeamId}::${key}` : key;
+}
+
 function dbRead(key, fallback) {
   try {
-    const raw = localStorage.getItem(key);
+    const raw = localStorage.getItem(scopedKey(key));
     if (raw === null) return fallback;
     return JSON.parse(raw);
   } catch (err) {
@@ -50,7 +71,7 @@ function dbRead(key, fallback) {
 
 function dbWrite(key, value) {
   try {
-    localStorage.setItem(key, JSON.stringify(value));
+    localStorage.setItem(scopedKey(key), JSON.stringify(value));
     return true;
   } catch (err) {
     console.error(`[db] Falha ao gravar "${key}" no localStorage:`, err);
@@ -203,7 +224,50 @@ function setActiveTimer(timerEntry) {
 }
 
 function clearActiveTimer() {
-  localStorage.removeItem(DB_KEYS.ACTIVE_TIMER);
+  localStorage.removeItem(scopedKey(DB_KEYS.ACTIVE_TIMER));
+}
+
+/* ========================================================================
+ * Migração única — dados de antes deste projeto virar "unificado"
+ * ========================================================================
+ * Antes desta versão, o app de campo da Pesquisa Agrícola vivia sozinho
+ * neste mesmo endereço (mesma URL), com as chaves do localStorage SEM
+ * prefixo de time (ex.: "ts_session", em vez de "pesquisa-agricola::ts_session").
+ * Sem essa migração, quem já usava o app — com apontamentos pendentes de
+ * sincronizar, sessão salva, cache de clientes/projetos — veria tudo
+ * "sumir" na primeira vez que abrisse esta versão nova: os dados
+ * continuariam lá, só que numa chave que o app novo não olha mais.
+ *
+ * Roda uma única vez por aparelho (marcada por MIGRATION_MARKER). Só migra
+ * quando ainda não há nenhuma chave prefixada com "pesquisa-agricola::" E
+ * ainda existe pelo menos uma chave antiga sem prefixo — ou seja, é seguro
+ * mesmo que rode em aparelhos que nunca tiveram o app antigo instalado
+ * (não faz nada nesse caso) e nunca sobrescreve dados que o app novo já
+ * tenha gravado. Depois de migrar, também fixa esse aparelho no time
+ * Pesquisa Agrícola automaticamente (era o único time que existia nesta
+ * URL) — assim quem já usava o app continua sem precisar escolher time
+ * nem logar de novo.
+ */
+const MIGRATION_MARKER = '__ts_legacy_migration_done__';
+const LEGACY_MIGRATION_TEAM_ID = 'pesquisa-agricola';
+const TEAM_STORAGE_KEY = 'ts_team_id';
+
+function migrateLegacyUnscopedDataIfNeeded() {
+  if (localStorage.getItem(MIGRATION_MARKER)) return;
+
+  const legacyKeys = Object.values(DB_KEYS).filter((k) => localStorage.getItem(k) !== null);
+  if (legacyKeys.length > 0) {
+    legacyKeys.forEach((k) => {
+      const oldValue = localStorage.getItem(k);
+      localStorage.setItem(`${LEGACY_MIGRATION_TEAM_ID}::${k}`, oldValue);
+      localStorage.removeItem(k);
+    });
+    if (!localStorage.getItem(TEAM_STORAGE_KEY)) {
+      localStorage.setItem(TEAM_STORAGE_KEY, LEGACY_MIGRATION_TEAM_ID);
+    }
+  }
+
+  localStorage.setItem(MIGRATION_MARKER, '1');
 }
 
 /* ---------------------- Sessão do colaborador logado ---------------------- */
@@ -217,7 +281,7 @@ function setSession(session) {
 }
 
 function clearSession() {
-  localStorage.removeItem(DB_KEYS.SESSION);
+  localStorage.removeItem(scopedKey(DB_KEYS.SESSION));
 }
 
 /* ---------------------- Senha do colaborador neste aparelho ---------------------- */
@@ -236,7 +300,7 @@ function setSenhaDispositivo(senha) {
 }
 
 function clearSenhaDispositivo() {
-  localStorage.removeItem(DB_KEYS.SENHA_DISPOSITIVO);
+  localStorage.removeItem(scopedKey(DB_KEYS.SENHA_DISPOSITIVO));
 }
 
 /* ---------------------- Cache de autenticação offline ---------------------- */
@@ -300,6 +364,8 @@ function getLastSync() {
 
 window.DB = {
   KEYS: DB_KEYS,
+  setActiveTeam,
+  migrateLegacyUnscopedDataIfNeeded,
   generateId,
   ensureSeeded,
 

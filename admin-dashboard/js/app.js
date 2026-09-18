@@ -13,6 +13,7 @@
 
 (function () {
   const SESSION_KEY = 'admin_session';
+  const TEAM_STORAGE_KEY = 'admin_team_id'; // não escopado por time — é a "ponteira" de qual time está ativo
 
   let state = {
     session: null, // { email, senha, nome, papel }
@@ -23,22 +24,27 @@
     cenarios: [],
   };
 
+  let currentTeam = null;
+
   const els = {
-    configScreen: document.getElementById('configScreen'),
+    teamScreen: document.getElementById('teamScreen'),
     loginScreen: document.getElementById('loginScreen'),
     dashboardScreen: document.getElementById('dashboardScreen'),
     sessionInfo: document.getElementById('sessionInfo'),
+    adminSidebar: document.getElementById('adminSidebar'),
     sessionUserName: document.getElementById('sessionUserName'),
     logoutButton: document.getElementById('logoutButton'),
+    loadingBar: document.getElementById('loadingBar'),
+    loadingStatus: document.getElementById('loadingStatus'),
+    tabLoadingOverlay: document.getElementById('tabLoadingOverlay'),
 
-    configForm: document.getElementById('configForm'),
-    apiUrlInput: document.getElementById('apiUrlInput'),
-    configTestResult: document.getElementById('configTestResult'),
+    teamList: document.getElementById('teamList'),
+    teamTestResult: document.getElementById('teamTestResult'),
 
     loginForm: document.getElementById('loginForm'),
     loginEmail: document.getElementById('loginEmail'),
     loginPassword: document.getElementById('loginPassword'),
-    changeApiUrlButton: document.getElementById('changeApiUrlButton'),
+    changeTeamButton: document.getElementById('changeTeamButton'),
 
     toastArea: document.getElementById('toastArea'),
 
@@ -110,6 +116,19 @@
     gerarResumoIAButton: document.getElementById('gerarResumoIAButton'),
     resumoIAResultado: document.getElementById('resumoIAResultado'),
     exportPdfButton: document.getElementById('exportPdfButton'),
+    shareHtmlButton: document.getElementById('shareHtmlButton'),
+    shareHtmlModal: document.getElementById('shareHtmlModal'),
+    shareHtmlSecaoApontamentos: document.getElementById('shareHtmlSecaoApontamentos'),
+    shareHtmlSecaoEquipe: document.getElementById('shareHtmlSecaoEquipe'),
+    shareHtmlSecaoFinanceiroWrap: document.getElementById('shareHtmlSecaoFinanceiroWrap'),
+    shareHtmlSecaoFinanceiro: document.getElementById('shareHtmlSecaoFinanceiro'),
+    shareHtmlColaboradoresWrap: document.getElementById('shareHtmlColaboradoresWrap'),
+    shareHtmlColaboradoresList: document.getElementById('shareHtmlColaboradoresList'),
+    shareHtmlColaboradoresTodos: document.getElementById('shareHtmlColaboradoresTodos'),
+    shareHtmlColaboradoresNenhum: document.getElementById('shareHtmlColaboradoresNenhum'),
+    shareHtmlCancelButton: document.getElementById('shareHtmlCancelButton'),
+    shareHtmlConfirmButton: document.getElementById('shareHtmlConfirmButton'),
+    printReportHeader: document.getElementById('printReportHeader'),
     printReportHeaderMeta: document.getElementById('printReportHeaderMeta'),
     themeToggleButton: document.getElementById('themeToggleButton'),
 
@@ -214,6 +233,7 @@
     relatorioMesSelect: document.getElementById('relatorioMesSelect'),
     relatorioVoltarButton: document.getElementById('relatorioVoltarButton'),
     relatorioExportPdfButton: document.getElementById('relatorioExportPdfButton'),
+    relatorioShareHtmlButton: document.getElementById('relatorioShareHtmlButton'),
     relatorioEmptyState: document.getElementById('relatorioEmptyState'),
     relatorioConteudo: document.getElementById('relatorioConteudo'),
     relatorioResumoBox: document.getElementById('relatorioResumoBox'),
@@ -238,6 +258,34 @@
   };
 
   const THEME_STORAGE_KEY = 'timesheet_admin_theme';
+
+  // Indicador global de carregamento — contador em vez de booleano porque
+  // vários carregamentos podem se sobrepor (ex.: trocar de aba rápido demais
+  // dispara dois loadApontamentos ao mesmo tempo); só esconde quando o
+  // último terminar, não no primeiro que resolver.
+  let loadingCount = 0;
+  function beginLoading() {
+    loadingCount++;
+    els.loadingBar.classList.remove('hidden');
+    els.loadingStatus.classList.remove('hidden');
+    // O overlay é um elemento único, reaproveitado: move pra dentro de
+    // qualquer que seja a aba visível no momento, então sempre cobre a aba
+    // certa mesmo trocando de aba entre um carregamento e outro.
+    const painelAtivo = document.querySelector('.tab-panel:not(.hidden)');
+    if (painelAtivo) {
+      painelAtivo.appendChild(els.tabLoadingOverlay);
+      els.tabLoadingOverlay.classList.remove('hidden');
+    }
+  }
+  function endLoading() {
+    loadingCount = Math.max(0, loadingCount - 1);
+    if (loadingCount === 0) {
+      els.loadingBar.classList.add('hidden');
+      els.loadingStatus.classList.add('hidden');
+      els.tabLoadingOverlay.classList.add('hidden');
+    }
+  }
+
   let equipeTetoPercent = 90;
   let horasDiariasZoom = 1;
   const HORAS_DIARIAS_BASE_WIDTH = 820;
@@ -272,9 +320,10 @@
     initTheme();
     wireStaticHandlers();
 
-    const savedUrl = Api.getBaseUrl();
-    if (!savedUrl) {
-      showScreen('config');
+    const team = resolveActiveTeam();
+    if (!team) {
+      renderTeamList();
+      showScreen('team');
       return;
     }
 
@@ -287,17 +336,101 @@
     }
   }
 
+  /* -------------------------------- Time ativo ------------------------------- */
+
+  // Lê o time salvo (se houver) e deixa a API e a lista de atividades (usada
+  // pelos gráficos) apontando pra esse time. Retorna null se nenhum time
+  // válido está salvo ainda (primeiro acesso neste navegador, ou id
+  // desatualizado).
+  function resolveActiveTeam() {
+    const teamId = localStorage.getItem(TEAM_STORAGE_KEY);
+    if (!teamId) return null;
+    const team = window.TEAMS_DATA.getTeamById(teamId);
+    if (!team) return null;
+    activateTeam(team);
+    return team;
+  }
+
+  function activateTeam(team) {
+    currentTeam = team;
+    Api.setBaseUrl(team.apiUrl);
+    window.APP_DATA = {
+      ACTIVITIES: window.TEAMS_DATA.buildActivities(team),
+      slugify: window.TEAMS_DATA.slugify,
+    };
+  }
+
+  function renderTeamList() {
+    els.teamList.innerHTML = '';
+    window.TEAMS_DATA.TEAMS.forEach((team) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn--start';
+      btn.textContent = team.nome;
+      btn.addEventListener('click', () => onTeamSelect(team.id));
+      els.teamList.appendChild(btn);
+    });
+    els.teamTestResult.textContent = '';
+    els.teamTestResult.className = 'config-test-result';
+  }
+
+  // Trocar de time sempre exige login de novo (a sessão de um time não vale
+  // para o backend de outro) — evita qualquer ambiguidade sobre qual base o
+  // admin está enxergando.
+  async function onTeamSelect(teamId) {
+    const team = window.TEAMS_DATA.getTeamById(teamId);
+    if (!team) return;
+    els.teamTestResult.textContent = 'Testando conexão...';
+    els.teamTestResult.className = 'config-test-result';
+    try {
+      await Api.ping(team.apiUrl);
+      localStorage.setItem(TEAM_STORAGE_KEY, team.id);
+      activateTeam(team);
+      state.session = null;
+      state.clientes = [];
+      state.projetos = [];
+      state.colaboradores = [];
+      state.apontamentos = [];
+      state.cenarios = [];
+      clearSession();
+      els.teamTestResult.textContent = `Conectado ao time ${team.nome}.`;
+      els.teamTestResult.classList.add('ok');
+      setTimeout(() => showScreen('login'), 500);
+    } catch (err) {
+      els.teamTestResult.textContent = `Não foi possível conectar: ${err.message}`;
+      els.teamTestResult.classList.add('error');
+    }
+  }
+
   function wireStaticHandlers() {
-    els.configForm.addEventListener('submit', onConfigSubmit);
     els.loginForm.addEventListener('submit', onLoginSubmit);
-    els.changeApiUrlButton.addEventListener('click', () => {
-      showScreen('config');
-      els.apiUrlInput.value = Api.getBaseUrl();
+    els.changeTeamButton.addEventListener('click', () => {
+      renderTeamList();
+      showScreen('team');
     });
     els.logoutButton.addEventListener('click', onLogout);
 
     els.tabButtons.forEach((btn) => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
     els.exportPdfButton.addEventListener('click', exportReportPdf);
+    els.shareHtmlButton.addEventListener('click', openShareHtmlModal);
+    els.shareHtmlCancelButton.addEventListener('click', closeShareHtmlModal);
+    els.shareHtmlModal.addEventListener('click', (e) => {
+      if (e.target === els.shareHtmlModal) closeShareHtmlModal();
+    });
+    els.shareHtmlSecaoApontamentos.addEventListener('change', () => {
+      els.shareHtmlColaboradoresWrap.classList.toggle('hidden', !els.shareHtmlSecaoApontamentos.checked);
+    });
+    els.shareHtmlColaboradoresTodos.addEventListener('click', () => {
+      els.shareHtmlColaboradoresList
+        .querySelectorAll('input[type="checkbox"]')
+        .forEach((cb) => { cb.checked = true; });
+    });
+    els.shareHtmlColaboradoresNenhum.addEventListener('click', () => {
+      els.shareHtmlColaboradoresList
+        .querySelectorAll('input[type="checkbox"]')
+        .forEach((cb) => { cb.checked = false; });
+    });
+    els.shareHtmlConfirmButton.addEventListener('click', onShareHtmlConfirm);
 
     els.equipeTetoInput.addEventListener('input', (e) => {
       const v = Number(e.target.value);
@@ -344,6 +477,7 @@
     els.relatorioMesSelect.addEventListener('change', renderRelatorio);
     els.relatorioVoltarButton.addEventListener('click', () => switchTab('colaboradores'));
     els.relatorioExportPdfButton.addEventListener('click', exportRelatorioColaboradorPdf);
+    els.relatorioShareHtmlButton.addEventListener('click', shareRelatorioColaboradorHtml);
 
     // Clientes
     els.newClienteButton.addEventListener('click', () => openClienteForm());
@@ -381,31 +515,11 @@
   }
 
   function showScreen(name) {
-    els.configScreen.classList.toggle('hidden', name !== 'config');
+    els.teamScreen.classList.toggle('hidden', name !== 'team');
     els.loginScreen.classList.toggle('hidden', name !== 'login');
     els.dashboardScreen.classList.toggle('hidden', name !== 'dashboard');
     els.sessionInfo.classList.toggle('hidden', name !== 'dashboard');
-  }
-
-  /* ------------------------------ Configuração ----------------------------- */
-
-  async function onConfigSubmit(e) {
-    e.preventDefault();
-    const url = els.apiUrlInput.value.trim();
-    els.configTestResult.textContent = 'Testando conexão...';
-    els.configTestResult.className = 'config-test-result';
-    try {
-      await Api.ping(url);
-      Api.setBaseUrl(url);
-      els.configTestResult.textContent = 'Conectado com sucesso!';
-      els.configTestResult.classList.add('ok');
-      setTimeout(() => {
-        showScreen('login');
-      }, 500);
-    } catch (err) {
-      els.configTestResult.textContent = `Não foi possível conectar: ${err.message}`;
-      els.configTestResult.classList.add('error');
-    }
+    els.adminSidebar.classList.toggle('hidden', name !== 'dashboard');
   }
 
   /* --------------------------------- Login --------------------------------- */
@@ -466,6 +580,7 @@
   }
 
   async function loadAll() {
+    beginLoading();
     try {
       const [clientes, projetos, colaboradores] = await Promise.all([
         Api.listClientes(state.session),
@@ -488,6 +603,8 @@
       } else {
         toast(`Erro ao carregar dados: ${err.message}`, 'error');
       }
+    } finally {
+      endLoading();
     }
   }
 
@@ -560,6 +677,274 @@
     window.addEventListener('afterprint', restore);
 
     window.print();
+  }
+
+  /* ------------------- Compartilhar relatório em HTML (arquivo) ------------------- */
+  /*
+   * Alternativa ao Exportar PDF: em vez de imprimir, gera um arquivo .html
+   * autocontido (CSS e logos embutidos, sem depender de nenhum outro arquivo
+   * do projeto) com um snapshot estático das mesmas seções do relatório, e
+   * baixa esse arquivo no computador do usuário. O arquivo pode ser
+   * compartilhado por e-mail, WhatsApp, Drive etc. e abre "bonito" em
+   * qualquer navegador — sem os problemas de layout que o PDF tem.
+   */
+
+  const SHARE_HTML_STRIP_SELECTORS = [
+    '.no-print', '.admin-header__session', '.admin-sidebar', '.watermark',
+    '.theme-toggle', 'form', '.panel-header__controls', '.row-actions',
+    '.chart-zoom-controls', '.loading-bar', '#tabLoadingOverlay', '#toastArea',
+    // Diferente do .chart-zoom-controls da Financeira (que divide espaço com a
+    // legenda em .projecao-toolbar), o de "Horas apontadas por dia" mora
+    // sozinho dentro de .horas-diarias-filtro — sem essa linha, sobraria uma
+    // caixa com borda vazia no arquivo exportado depois que os controles de
+    // zoom (only-print, não fazem sentido num HTML estático) são removidos.
+    '.horas-diarias-filtro',
+  ];
+
+  // Mesmos valores de --color-* usados no PDF (ver @media print em
+  // css/styles.css), pra garantir tema claro no HTML compartilhado mesmo se
+  // o dashboard estiver no modo escuro no momento da geração.
+  const SHARE_HTML_LIGHT_THEME_CSS = `
+    :root, :root[data-theme="dark"] {
+      --color-primary: #1f6f54;
+      --color-primary-dark: #16503d;
+      --color-primary-light: #e6f2ee;
+      --color-text: #1e2422;
+      --color-text-muted: #5c6863;
+      --color-border: #d9e0dc;
+      --color-bg: #ffffff;
+      --color-surface: #ffffff;
+      --status-good: #0ca30c;
+      --status-good-bg: #e3f7e3;
+      --status-warning: #8a6d1a;
+      --status-warning-bg: #fdf0d9;
+      --status-critical: #b3271f;
+      --status-critical-bg: #fbe3e3;
+      --capacity-bar: #aab8c2;
+      --capacity-bar-border: #8a9aa5;
+      --count-line: #6b4fa0;
+      --weekend-band: #eef1f0;
+      --holiday-band: #f3ecd6;
+    }
+    .admin-header__logo-exa { filter: none !important; }
+    body { padding: 0; background: var(--color-bg); }
+    .admin-shell { display: block; max-width: 960px; margin: 0 auto; padding: 24px 20px 48px; }
+    .admin-main { max-width: 100%; padding: 0; }
+    .card { box-shadow: none; border: 1px solid var(--color-border); margin-bottom: 24px; }
+    .print-report-header { display: block; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid var(--color-primary); }
+    /* Um bloco "Horas apontadas por dia" por colaborador, na exportação em
+       HTML — ver buildTodosColaboradoresHorasDiariasHtml(). */
+    .horas-diarias-colaborador-bloco { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--color-border); }
+    .horas-diarias-colaborador-bloco:first-child { margin-top: 12px; padding-top: 0; border-top: none; }
+    .horas-diarias-colaborador-nome { margin: 0 0 10px; font-size: 1rem; font-weight: 700; color: var(--color-primary-dark); }
+  `;
+
+  // Lê o CSS já aplicado na página via CSSOM (document.styleSheets) em vez de
+  // buscar o arquivo de novo com fetch(). Isso é proposital: o dashboard
+  // costuma ser aberto direto como arquivo local (file://) e, nesse caso,
+  // fetch() de outro arquivo local é bloqueado pelo navegador por política
+  // de CORS — ler as regras já carregadas funciona em file:// e em http://.
+  function collectPageCssTextForShare() {
+    const parts = [];
+    Array.from(document.styleSheets).forEach((sheet) => {
+      try {
+        Array.from(sheet.cssRules || []).forEach((rule) => parts.push(rule.cssText));
+      } catch (err) {
+        // Stylesheet não acessível via CSSOM (ex.: veio de outra origem) — ignora.
+      }
+    });
+    return parts.join('\n');
+  }
+
+  // Mesma lógica: em vez de baixar a imagem de novo com fetch() (bloqueado em
+  // file://), desenha o <img> que já está carregado na tela num <canvas> e lê
+  // o resultado como data URL — funciona independente de como a página foi aberta.
+  function imageElementToDataUrlForShare(imgEl) {
+    try {
+      const w = imgEl.naturalWidth || imgEl.width;
+      const h = imgEl.naturalHeight || imgEl.height;
+      if (!w || !h) return imgEl.src;
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext('2d').drawImage(imgEl, 0, 0, w, h);
+      return canvas.toDataURL('image/png');
+    } catch (err) {
+      // Canvas "tainted" ou outra restrição — mantém o caminho original da imagem.
+      return imgEl.src;
+    }
+  }
+
+  function stripForShareHtml(node) {
+    SHARE_HTML_STRIP_SELECTORS.forEach((sel) => {
+      node.querySelectorAll(sel).forEach((el) => el.remove());
+    });
+    return node;
+  }
+
+  /** Monta o documento HTML autocontido com o cabeçalho + os painéis
+   * indicados. Assume que quem chamou já atualizou printReportHeaderMeta e
+   * carregou/renderizou os dados desses painéis.
+   *
+   * `options.horasDiariasTodosHtml`, se informado, substitui o conteúdo de
+   * "Horas apontadas por dia" (que ao vivo mostra só o colaborador
+   * selecionado no filtro) pelo HTML de todos os colaboradores — ver
+   * buildTodosColaboradoresHorasDiariasHtml(). */
+  async function buildShareHtmlDocument(panelIds, options) {
+    options = options || {};
+    const cssText = collectPageCssTextForShare();
+
+    const originalHeaderImgs = Array.from(document.querySelectorAll('.admin-header img'));
+    const headerClone = document.querySelector('.admin-header').cloneNode(true);
+    stripForShareHtml(headerClone);
+    Array.from(headerClone.querySelectorAll('img')).forEach((img, i) => {
+      const original = originalHeaderImgs[i];
+      if (original) img.src = imageElementToDataUrlForShare(original);
+    });
+
+    const reportHeaderClone = els.printReportHeader.cloneNode(true);
+
+    const panelsHtml = panelIds
+      .map((id) => document.getElementById(id))
+      .filter(Boolean)
+      .map((panel) => {
+        const clone = stripForShareHtml(panel.cloneNode(true));
+        // O painel pode estar com a classe "hidden" no DOM ao vivo (se a aba
+        // não é a que está ativa no momento) — remove pra garantir que
+        // apareça no arquivo exportado independente da aba atual.
+        clone.classList.remove('hidden');
+        if (panel.id === 'tab-apontamentos' && options.horasDiariasTodosHtml) {
+          const secao = clone.querySelector('#horasDiariasSecaoConteudo');
+          if (secao) secao.innerHTML = options.horasDiariasTodosHtml;
+        }
+        return clone.outerHTML;
+      })
+      .join('\n');
+
+    return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Gestão de Pessoas — Relatório</title>
+<style>
+${cssText}
+${SHARE_HTML_LIGHT_THEME_CSS}
+</style>
+</head>
+<body>
+<div class="admin-shell">
+${headerClone.outerHTML}
+${reportHeaderClone.outerHTML}
+<main class="admin-main">
+${panelsHtml}
+</main>
+</div>
+</body>
+</html>`;
+  }
+
+  function downloadHtmlFile(htmlString, filenamePrefix) {
+    const blob = new Blob([htmlString], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const stamp = new Date().toISOString().slice(0, 10);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filenamePrefix}-${stamp}.html`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+
+  /** Abre o modal de seleção do que entra no HTML compartilhado: quais seções
+   * (Apontamentos / Equipe / Financeira e Estratégia — esta última só se o
+   * admin logado tem acesso financeiro) e, dentro de Apontamentos, quais
+   * colaboradores aparecem em "Horas apontadas por dia". */
+  function openShareHtmlModal() {
+    els.shareHtmlSecaoApontamentos.checked = true;
+    els.shareHtmlSecaoEquipe.checked = true;
+    els.shareHtmlSecaoFinanceiro.checked = true;
+    els.shareHtmlSecaoFinanceiroWrap.classList.toggle('hidden', !state.session.acessoFinanceiro);
+
+    populateShareHtmlColaboradoresList();
+    els.shareHtmlColaboradoresWrap.classList.remove('hidden');
+
+    els.shareHtmlModal.classList.remove('hidden');
+  }
+
+  function closeShareHtmlModal() {
+    els.shareHtmlModal.classList.add('hidden');
+  }
+
+  function populateShareHtmlColaboradoresList() {
+    const ativos = state.colaboradores
+      .filter((c) => c.ativo)
+      .slice()
+      .sort((a, b) => a.nome.localeCompare(b.nome));
+    els.shareHtmlColaboradoresList.innerHTML = ativos
+      .map((c) => `<label><input type="checkbox" value="${c.id}" checked /> ${escapeHtml(c.nome)}</label>`)
+      .join('') || '<p class="muted">Nenhum colaborador ativo.</p>';
+  }
+
+  function onShareHtmlConfirm() {
+    const selecao = {
+      apontamentos: els.shareHtmlSecaoApontamentos.checked,
+      equipe: els.shareHtmlSecaoEquipe.checked,
+      financeiro: state.session.acessoFinanceiro && els.shareHtmlSecaoFinanceiro.checked,
+      colaboradorIds: Array.from(
+        els.shareHtmlColaboradoresList.querySelectorAll('input[type="checkbox"]:checked')
+      ).map((cb) => cb.value),
+    };
+
+    if (!selecao.apontamentos && !selecao.equipe && !selecao.financeiro) {
+      toast('Selecione ao menos uma seção para compartilhar.', 'error');
+      return;
+    }
+
+    closeShareHtmlModal();
+    shareReportHtml(selecao);
+  }
+
+  async function shareReportHtml(selecao) {
+    const REPORT_PANEL_IDS = [];
+    if (selecao.apontamentos) REPORT_PANEL_IDS.push('tab-apontamentos');
+    if (selecao.equipe) REPORT_PANEL_IDS.push('tab-equipe');
+    if (selecao.financeiro) REPORT_PANEL_IDS.push('tab-financeira', 'tab-estrategia');
+
+    els.shareHtmlButton.disabled = true;
+    try {
+      await loadApontamentos();
+      if (selecao.equipe) {
+        populateEquipeAnoSelect();
+        renderEquipe();
+      }
+      if (selecao.financeiro) {
+        populateFinanceiraAnoSelect();
+        renderFinanceira();
+        await loadEstrategiaCenarios();
+      }
+
+      const agora = new Date();
+      els.printReportHeaderMeta.textContent =
+        `Relatório gerado em ${agora.toLocaleDateString('pt-BR')} às ` +
+        `${agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+
+      // "Horas apontadas por dia" ao vivo mostra 1 colaborador por vez (filtro
+      // no topo); no arquivo compartilhado, mostra só quem foi marcado no
+      // modal — ver buildTodosColaboradoresHorasDiariasHtml().
+      const horasDiariasTodosHtml = selecao.apontamentos
+        ? buildTodosColaboradoresHorasDiariasHtml(selecao.colaboradorIds)
+        : '';
+
+      const html = await buildShareHtmlDocument(REPORT_PANEL_IDS, { horasDiariasTodosHtml });
+      downloadHtmlFile(html, 'gestao-de-pessoas');
+      toast('Arquivo HTML gerado. Confira sua pasta de downloads.', 'success');
+    } catch (err) {
+      toast(`Não foi possível gerar o HTML: ${err.message}`, 'error');
+    } finally {
+      els.shareHtmlButton.disabled = false;
+    }
   }
 
   /* -------------------------------- Clientes -------------------------------- */
@@ -732,6 +1117,37 @@
 
   /* ------------------------------ Colaboradores ------------------------------ */
 
+  // Cargos são fixos por time (definidos em js/teams.js, mesma regra de
+  // negócio das atividades — não editáveis pelo admin). Se o colaborador já
+  // tiver um cargo salvo que não está mais na lista fixa do time (cadastro
+  // antigo, de antes dessa mudança, ou o time mudou a lista), mantém esse
+  // valor como uma opção extra no topo — assim o formulário nunca troca o
+  // cargo de alguém sem o admin escolher isso de propósito.
+  function populateColaboradorCargoSelect(currentValue) {
+    els.colaboradorCargo.innerHTML = '';
+    const vazio = document.createElement('option');
+    vazio.value = '';
+    vazio.textContent = 'Sem cargo definido';
+    els.colaboradorCargo.appendChild(vazio);
+
+    const cargosDoTime = (currentTeam && currentTeam.cargos) || [];
+    if (currentValue && !cargosDoTime.includes(currentValue)) {
+      const legado = document.createElement('option');
+      legado.value = currentValue;
+      legado.textContent = `${currentValue} (fora da lista atual do time)`;
+      els.colaboradorCargo.appendChild(legado);
+    }
+
+    cargosDoTime.forEach((cargo) => {
+      const opt = document.createElement('option');
+      opt.value = cargo;
+      opt.textContent = cargo;
+      els.colaboradorCargo.appendChild(opt);
+    });
+
+    els.colaboradorCargo.value = currentValue || '';
+  }
+
   function openColaboradorForm(colaborador) {
     els.colaboradorForm.classList.remove('hidden');
     els.colaboradorSenha.value = '';
@@ -740,7 +1156,7 @@
       els.colaboradorNome.value = colaborador.nome;
       els.colaboradorEmail.value = colaborador.email;
       els.colaboradorPapel.value = colaborador.papel;
-      els.colaboradorCargo.value = colaborador.cargo || '';
+      populateColaboradorCargoSelect(colaborador.cargo || '');
       els.colaboradorDedicacaoDiaria.value = colaborador.dedicacaoDiaria || 8;
       els.colaboradorCustoMensal.value = colaborador.custoMensal || '';
       els.colaboradorAtivo.checked = colaborador.ativo;
@@ -752,7 +1168,7 @@
       els.colaboradorNome.value = '';
       els.colaboradorEmail.value = '';
       els.colaboradorPapel.value = 'colaborador';
-      els.colaboradorCargo.value = '';
+      populateColaboradorCargoSelect('');
       els.colaboradorDedicacaoDiaria.value = 8;
       els.colaboradorCustoMensal.value = '';
       els.colaboradorAtivo.checked = true;
@@ -837,9 +1253,34 @@
         rowActions.className = 'row-actions';
         rowActions.appendChild(editBtn);
         rowActions.appendChild(relatorioBtn);
+        // Não deixa excluir o próprio usuário logado (o backend também
+        // recusa) — some o botão em vez de deixar clicar e dar erro.
+        // Compara por e-mail (não por id): a sessão do Dashboard não guarda o
+        // id do colaborador, só e-mail/nome/papel/acessoFinanceiro.
+        if (colaborador.email.toLowerCase() !== state.session.email.toLowerCase()) {
+          const delBtn = document.createElement('button');
+          delBtn.title = 'Excluir colaborador';
+          delBtn.textContent = '🗑';
+          delBtn.addEventListener('click', () => onExcluirColaborador(colaborador));
+          rowActions.appendChild(delBtn);
+        }
         actionsTd.appendChild(rowActions);
         els.colaboradoresTableBody.appendChild(tr);
       });
+  }
+
+  async function onExcluirColaborador(colaborador) {
+    const confirmado = confirm(
+      `Excluir o colaborador "${colaborador.nome}"? Essa ação não pode ser desfeita. Os apontamentos que ele já lançou continuam no histórico, só não será mais possível ele entrar no sistema.`
+    );
+    if (!confirmado) return;
+    try {
+      await Api.excluirColaborador(state.session, colaborador.id);
+      toast('Colaborador excluído.', 'success');
+      await loadAll();
+    } catch (err) {
+      toast(err.message, 'error');
+    }
   }
 
   /* ------------------------------- Apontamentos ------------------------------- */
@@ -1086,6 +1527,78 @@
     renderHorasDiariasStatus(dados);
     renderHorasDiariasAtividade(dados);
     applyHorasDiariasZoom();
+  }
+
+  /** Gera o HTML de "Horas apontadas por dia" para os colaboradores marcados
+   * no modal de compartilhamento (ou todos os ativos, se `colaboradorIds` não
+   * for informado), no mês selecionado no filtro — usado só na exportação/
+   * compartilhamento em HTML (ver shareReportHtml), já que a tela ao vivo
+   * mostra um colaborador por vez (ver renderHorasDiarias acima). Renderiza
+   * cada colaborador num container temporário fora da tela (reaproveitando
+   * renderHorasDiariasStatus/renderHorasDiariasAtividade, que escrevem no
+   * elemento pelo id) e junta o resultado de cada um num bloco com o nome
+   * da pessoa. */
+  function buildTodosColaboradoresHorasDiariasHtml(colaboradorIds) {
+    const mesValue = els.horasDiariasMes.value;
+    if (!mesValue) return '';
+    const [year, month] = mesValue.split('-').map(Number);
+
+    const idsSet = colaboradorIds ? new Set(colaboradorIds) : null;
+    const colaboradoresAtivos = state.colaboradores
+      .filter((c) => c.ativo && (!idsSet || idsSet.has(c.id)))
+      .slice()
+      .sort((a, b) => a.nome.localeCompare(b.nome));
+
+    if (!colaboradoresAtivos.length) {
+      return '<p class="empty-state">Nenhum colaborador selecionado para este relatório.</p>';
+    }
+
+    const temp = document.createElement('div');
+    temp.style.cssText = 'position:absolute; left:-99999px; top:-99999px; width:1px; height:1px; overflow:hidden;';
+    document.body.appendChild(temp);
+
+    const blocos = colaboradoresAtivos.map((colaborador) => {
+      const dados = gerarDadosHorasDiarias(colaborador.id, year, month);
+      if (!dados) return '';
+
+      temp.innerHTML =
+        '<svg id="chartHorasDiariasStatus_tmp"></svg>' +
+        '<svg id="chartHorasDiariasAtividade_tmp"></svg>' +
+        '<div id="legendHorasDiariasAtividade_tmp"></div>';
+      renderHorasDiariasStatus(dados, 'chartHorasDiariasStatus_tmp');
+      renderHorasDiariasAtividade(dados, 'chartHorasDiariasAtividade_tmp', 'legendHorasDiariasAtividade_tmp');
+      const statusInner = document.getElementById('chartHorasDiariasStatus_tmp').innerHTML;
+      const atividadeInner = document.getElementById('chartHorasDiariasAtividade_tmp').innerHTML;
+      const legendInner = document.getElementById('legendHorasDiariasAtividade_tmp').innerHTML;
+      const temApontamento = dados.dias.some((d) => d.horas > 0);
+
+      return `
+        <div class="horas-diarias-colaborador-bloco">
+          <h4 class="horas-diarias-colaborador-nome">${escapeHtml(colaborador.nome)}</h4>
+          <p class="empty-state${temApontamento ? ' hidden' : ''}">Nenhum apontamento concluído neste mês para este colaborador.</p>
+          <p class="muted"><strong>Situação do dia</strong> — cor conforme as horas apontadas frente à dedicação diária (linha tracejada).</p>
+          <div class="chart-wrap">
+            <svg height="260" viewBox="0 0 820 260" role="img" aria-label="Horas apontadas por dia, coloridas pela situação — ${escapeHtml(colaborador.nome)}">${statusInner}</svg>
+          </div>
+          <div class="legend-row">
+            <span><i style="background: var(--status-good)"></i>Na meta ou acima</span>
+            <span><i style="background: var(--status-warning)"></i>Abaixo da meta</span>
+            <span><i style="background: var(--status-critical)"></i>Sem apontamento (dia útil)</span>
+            <span><i style="background: var(--weekend-band); border: 1px solid var(--color-border);"></i>Fim de semana</span>
+            <span><i style="background: var(--holiday-band); border: 1px solid var(--color-border);"></i>Feriado</span>
+            <span><i class="line"></i>Dedicação diária</span>
+          </div>
+          <p class="muted" style="margin-top: var(--space-4);"><strong>Composição por atividade</strong> — mesmo eixo, mostrando em que a pessoa trabalhou naquele dia.</p>
+          <div class="chart-wrap">
+            <svg height="260" viewBox="0 0 820 260" role="img" aria-label="Horas apontadas por dia, por atividade — ${escapeHtml(colaborador.nome)}">${atividadeInner}</svg>
+          </div>
+          <div class="legend-row">${legendInner}</div>
+        </div>
+      `;
+    }).join('');
+
+    document.body.removeChild(temp);
+    return blocos;
   }
 
   async function onExcluirPeriodo() {
@@ -1409,7 +1922,10 @@
 
   function financeiraCorDoProjeto(dados, id) {
     const i = dados.findIndex((o) => o.id === id);
-    return `var(--activity-${(i % 6) + 1})`;
+    // Reaproveita a paleta categórica de 8 cores validadas (slot 9 é
+    // reservado ao cinza neutro da atividade "Capacitação e Treinamento" no
+    // time de Drone, não entra no ciclo de cores de projeto/cargo).
+    return `var(--activity-${(i % 8) + 1})`;
   }
 
   function renderFinanceiraProjecaoLegend(dados) {
@@ -1567,7 +2083,7 @@
     const fatias = Object.entries(porCargo)
       .map(([cargo, valor]) => ({ cargo, valor }))
       .sort((a, b) => b.valor - a.valor)
-      .map((f, i) => ({ ...f, color: `var(--activity-${(i % 6) + 1})` }));
+      .map((f, i) => ({ ...f, color: `var(--activity-${(i % 8) + 1})` }));
 
     const size = 200, cx = size / 2, cy = size / 2, rOuter = 90, rInner = 50;
     const svgParts = [];
@@ -1689,6 +2205,7 @@
   /* -------------------------------- Estratégia ------------------------------- */
 
   async function loadEstrategiaCenarios() {
+    beginLoading();
     try {
       const cenarios = await Api.listCenarios(state.session);
       state.cenarios = cenarios;
@@ -1709,6 +2226,8 @@
       } else {
         toast(`Erro ao carregar cenários: ${err.message}`, 'error');
       }
+    } finally {
+      endLoading();
     }
   }
 
@@ -2455,6 +2974,24 @@
     window.print();
   }
 
+  async function shareRelatorioColaboradorHtml() {
+    els.relatorioShareHtmlButton.disabled = true;
+    try {
+      const agora = new Date();
+      els.printReportHeaderMeta.textContent =
+        `${els.relatorioSubtitle.textContent} · gerado em ${agora.toLocaleDateString('pt-BR')} às ` +
+        `${agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+
+      const html = await buildShareHtmlDocument(['tab-relatorio']);
+      downloadHtmlFile(html, 'relatorio-colaborador');
+      toast('Arquivo HTML gerado. Confira sua pasta de downloads.', 'success');
+    } catch (err) {
+      toast(`Não foi possível gerar o HTML: ${err.message}`, 'error');
+    } finally {
+      els.relatorioShareHtmlButton.disabled = false;
+    }
+  }
+
   /* ----------------------------- Ranking da equipe ---------------------------- */
 
   /** Média mensal de cada métrica do ranking, olhando os `monthsBack` meses
@@ -2691,6 +3228,7 @@
   }
 
   async function loadApontamentos() {
+    beginLoading();
     try {
       const apontamentos = await fetchTodosApontamentos(state.session);
       state.apontamentos = apontamentos;
@@ -2711,6 +3249,8 @@
       } else {
         toast(`Erro ao carregar apontamentos: ${err.message}`, 'error');
       }
+    } finally {
+      endLoading();
     }
   }
 
@@ -3273,16 +3813,33 @@
     els.equipeAnoSelect.value = ordenados.includes(anterior) ? anterior : anoAtual;
   }
 
+  /** Isentos de apontamento (gerência/coordenação, normalmente) ficam fora do
+   * dimensionamento de capacidade — a dedicação diária deles não é "oferta"
+   * de horas de projeto, e eles raramente apontam mesmo, então contá-los
+   * só infla a capacidade sem nunca aparecer como "consumido" (derruba a
+   * ocupação artificialmente). Financeira continua contando o custo de
+   * todo mundo (salário é despesa real, isento ou não) — essa exclusão é só
+   * daqui, da aba Equipe. */
+  function equipeColaboradorConta(c) {
+    return c.ativo && c.obrigatorioApontamento !== false;
+  }
+
   function renderEquipe() {
     const year = Number(els.equipeAnoSelect.value) || new Date().getFullYear();
-    const ativos = state.colaboradores.filter((c) => c.ativo);
+    const ativos = state.colaboradores.filter(equipeColaboradorConta);
+    const ativosIds = new Set(ativos.map((c) => c.id));
     const somaDedicacao = ativos.reduce((acc, c) => acc + (Number(c.dedicacaoDiaria) || 8), 0);
 
     const capacidadeLiquida = EQUIPE_MESES.map((_, i) => Math.round(somaDedicacao * diasUteisNoMes(year, i)));
     const capacidadeSaudavel = capacidadeLiquida.map((v) => Math.round((v * equipeTetoPercent) / 100));
 
     const apontamentosDoAno = state.apontamentos.filter(
-      (a) => a.duracaoMinutos != null && a.duracaoMinutos > 0 && a.data && a.data.slice(0, 4) === String(year)
+      (a) =>
+        a.duracaoMinutos != null &&
+        a.duracaoMinutos > 0 &&
+        a.data &&
+        a.data.slice(0, 4) === String(year) &&
+        ativosIds.has(a.colaboradorId)
     );
 
     const consumido = new Array(12).fill(0);
@@ -3298,8 +3855,8 @@
     const colaboradoresPorMes = colabPorMes.map((s) => s.size);
     const projetosPorMes = projPorMes.map((s) => s.size);
 
-    equipeRenderKpis(year, somaDedicacao, capacidadeLiquida, capacidadeSaudavel, consumidoArredondado);
-    equipeRenderBarChart(capacidadeLiquida, capacidadeSaudavel, consumidoArredondado);
+    equipeRenderKpis(year, ativos.length, somaDedicacao, capacidadeLiquida, capacidadeSaudavel, consumidoArredondado);
+    equipeRenderBarChart(ativos.length, capacidadeLiquida, capacidadeSaudavel, consumidoArredondado);
     equipeRenderPctChart(capacidadeLiquida, consumidoArredondado);
     equipeRenderDualAxisChart('equipeChartColabDual', capacidadeSaudavel, colaboradoresPorMes, 'colaboradores com apontamento no mês');
     equipeRenderDualAxisChart('equipeChartProjDual', capacidadeSaudavel, projetosPorMes, 'projetos com apontamento no mês');
@@ -3308,7 +3865,7 @@
     equipeRenderHeatmap(apontamentosDoAno);
   }
 
-  function equipeRenderKpis(year, somaDedicacao, capacidadeLiquida, capacidadeSaudavel, consumido) {
+  function equipeRenderKpis(year, ativosCount, somaDedicacao, capacidadeLiquida, capacidadeSaudavel, consumido) {
     const anoAtual = new Date().getFullYear();
     const mesesConsiderados = year === anoAtual ? new Date().getMonth() + 1 : 12;
 
@@ -3328,7 +3885,7 @@
     els.kpiTetoSub.textContent = `margem de segurança de ${margem.toLocaleString('pt-BR')}h/ano`;
     els.kpiOcupacaoLabel.textContent = year === anoAtual ? 'Ocupação acumulada no ano' : `Ocupação em ${year}`;
     els.kpiOcupacaoValue.textContent = `${ocupacaoPct}%`;
-    els.kpiColaboradoresAtivosValue.textContent = String(state.colaboradores.filter((c) => c.ativo).length);
+    els.kpiColaboradoresAtivosValue.textContent = String(ativosCount);
 
     const projetosDoAno = new Set(
       state.apontamentos
@@ -3352,9 +3909,9 @@
     els.equipeLegendTetoLine.textContent = equipeTetoPercent;
   }
 
-  function equipeRenderBarChart(capacidadeLiquida, capacidadeSaudavel, consumido) {
+  function equipeRenderBarChart(ativosCount, capacidadeLiquida, capacidadeSaudavel, consumido) {
     const svg = document.getElementById('equipeChartHoras');
-    const semColaboradores = state.colaboradores.filter((c) => c.ativo).length === 0;
+    const semColaboradores = ativosCount === 0;
     els.equipeChartHorasEmptyState.classList.toggle('hidden', !semColaboradores);
     if (semColaboradores) {
       svg.innerHTML = '';
@@ -3599,7 +4156,7 @@
     const fatias = Object.entries(porCargo)
       .map(([cargo, minutos]) => ({ cargo, minutos }))
       .sort((a, b) => b.minutos - a.minutos)
-      .map((f, i) => ({ ...f, color: `var(--activity-${(i % 6) + 1})` }));
+      .map((f, i) => ({ ...f, color: `var(--activity-${(i % 8) + 1})` }));
 
     const size = 200, cx = size / 2, cy = size / 2, rOuter = 90, rInner = 50;
     const svgParts = [];

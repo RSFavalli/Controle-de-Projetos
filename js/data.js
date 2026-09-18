@@ -13,14 +13,14 @@
  * ------------------------------------------------------------------
  */
 
-// Ordem cronológica fixa do processo de trabalho.
+// Lista fixa de macroatividades da equipe de pesquisa agrícola.
 const ACTIVITY_NAMES = [
-  'Desenvolver metodologia',
-  'Preparar material',
-  'Coletar dados',
-  'Tratar dados',
-  'Analisar dados',
-  'Apresentar resultados',
+  'Desenvolver Metodologia',
+  'Preparar Material',
+  'Coletar Dados',
+  'Tratar Dados',
+  'Analisar Dados',
+  'Apresentar Resultados',
 ];
 
 function slugify(text) {
