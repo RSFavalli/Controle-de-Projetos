@@ -27,22 +27,40 @@ const Api = (() => {
     localStorage.removeItem(STORAGE_KEY);
   }
 
-  async function call(action, payload = {}) {
+  // O Apps Script pode ficar bem lento (cold start, planilha grande, ou
+  // simplesmente sobrecarregado) e, sem isso, um fetch() parado nunca dá
+  // erro sozinho — fica pendurado até o navegador desistir por conta
+  // própria, o que pode levar minutos. Com o timeout, uma resposta lenta
+  // vira um erro claro e acionável em vez de uma tela "travada".
+  const DEFAULT_TIMEOUT_MS = 20000;
+
+  async function fetchWithTimeout(url, options, timeoutMs) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        const seconds = Math.round(timeoutMs / 1000);
+        throw new Error(`O servidor demorou mais de ${seconds}s para responder. Pode estar sobrecarregado — tente novamente em instantes.`);
+      }
+      throw new Error('Não foi possível conectar à API. Verifique sua conexão com a internet e a URL configurada.');
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  async function call(action, payload = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
     const baseUrl = getBaseUrl();
     if (!baseUrl) {
       throw new Error('URL da API não configurada.');
     }
 
-    let res;
-    try {
-      res = await fetch(baseUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action, ...payload }),
-      });
-    } catch (networkErr) {
-      throw new Error('Não foi possível conectar à API. Verifique sua conexão com a internet e a URL configurada.');
-    }
+    const res = await fetchWithTimeout(baseUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action, ...payload }),
+    }, timeoutMs);
 
     let json;
     try {
@@ -57,9 +75,9 @@ const Api = (() => {
     return json.data;
   }
 
-  async function ping(baseUrlOverride) {
+  async function ping(baseUrlOverride, timeoutMs = DEFAULT_TIMEOUT_MS) {
     const url = (baseUrlOverride || getBaseUrl()) + (baseUrlOverride && baseUrlOverride.includes('?') ? '&' : '?') + 'action=ping';
-    const res = await fetch(url, { method: 'GET' });
+    const res = await fetchWithTimeout(url, { method: 'GET' }, timeoutMs);
     const json = await res.json();
     if (!json.ok) throw new Error(json.error || 'Falha ao testar a API.');
     return json;
@@ -73,6 +91,11 @@ const Api = (() => {
     ping,
 
     login: (email, senha) => call('login', { email, senha }),
+
+    // Autentica uma vez só e devolve clientes+projetos+colaboradores numa
+    // única chamada — usada pelo carregamento inicial do Dashboard no lugar
+    // de 3 chamadas separadas em paralelo (cada uma reautenticando do zero).
+    loadDashboardInit: (session) => call('loadDashboardInit', session),
 
     listClientes: (session) => call('listClientes', session),
     saveCliente: (session, cliente) => call('saveCliente', { ...session, cliente }),

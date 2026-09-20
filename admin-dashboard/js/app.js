@@ -37,13 +37,20 @@
     loadingBar: document.getElementById('loadingBar'),
     loadingStatus: document.getElementById('loadingStatus'),
     tabLoadingOverlay: document.getElementById('tabLoadingOverlay'),
+    tabLoadingSpinner: document.getElementById('tabLoadingSpinner'),
+    tabLoadingText: document.getElementById('tabLoadingText'),
+    tabLoadingRetryButton: document.getElementById('tabLoadingRetryButton'),
 
     teamList: document.getElementById('teamList'),
     teamTestResult: document.getElementById('teamTestResult'),
 
     loginForm: document.getElementById('loginForm'),
+    loginTeamName: document.getElementById('loginTeamName'),
     loginEmail: document.getElementById('loginEmail'),
     loginPassword: document.getElementById('loginPassword'),
+    loginSubmitButton: document.getElementById('loginSubmitButton'),
+    loginSubmitText: document.getElementById('loginSubmitText'),
+    loginSubmitSpinner: document.getElementById('loginSubmitSpinner'),
     changeTeamButton: document.getElementById('changeTeamButton'),
 
     toastArea: document.getElementById('toastArea'),
@@ -276,14 +283,45 @@
       painelAtivo.appendChild(els.tabLoadingOverlay);
       els.tabLoadingOverlay.classList.remove('hidden');
     }
+    // Garante que o overlay volta pro estado "carregando" — se a última vez
+    // tiver terminado em falha (showLoadFailure), sem isso ele reapareceria
+    // já mostrando o erro anterior por um instante.
+    els.tabLoadingOverlay.classList.remove('tab-loading-overlay--error');
+    els.tabLoadingSpinner.classList.remove('hidden');
+    els.tabLoadingText.textContent = 'Carregando…';
+    els.tabLoadingRetryButton.classList.add('hidden');
   }
   function endLoading() {
     loadingCount = Math.max(0, loadingCount - 1);
     if (loadingCount === 0) {
       els.loadingBar.classList.add('hidden');
       els.loadingStatus.classList.add('hidden');
-      els.tabLoadingOverlay.classList.add('hidden');
+      // Se showLoadFailure() acabou de colocar o overlay em modo de erro,
+      // deixa ele visível (com o botão de tentar novamente) em vez de
+      // escondê-lo aqui — senão o aviso pisca e some antes do usuário ler.
+      if (!els.tabLoadingOverlay.classList.contains('tab-loading-overlay--error')) {
+        els.tabLoadingOverlay.classList.add('hidden');
+      }
     }
+  }
+
+  // Ao contrário do toast (que some sozinho em 4s), esse aviso fica na tela
+  // até o usuário agir — pensado pra situação relatada de "clico, demora, e
+  // não sei se travou ou se está carregando": em vez de deixar a aba vazia
+  // e silenciosa, mostra o motivo e um jeito de tentar de novo sem precisar
+  // deslogar/atualizar/fechar o navegador.
+  function showLoadFailure(message, onRetry) {
+    const painelAtivo = document.querySelector('.tab-panel:not(.hidden)');
+    if (painelAtivo) painelAtivo.appendChild(els.tabLoadingOverlay);
+    els.tabLoadingOverlay.classList.remove('hidden');
+    els.tabLoadingOverlay.classList.add('tab-loading-overlay--error');
+    els.tabLoadingSpinner.classList.add('hidden');
+    els.tabLoadingText.textContent = message;
+    els.tabLoadingRetryButton.classList.remove('hidden');
+    els.tabLoadingRetryButton.onclick = () => {
+      els.tabLoadingOverlay.classList.add('hidden');
+      onRetry();
+    };
   }
 
   let equipeTetoPercent = 90;
@@ -358,6 +396,10 @@
       ACTIVITIES: window.TEAMS_DATA.buildActivities(team),
       slugify: window.TEAMS_DATA.slugify,
     };
+    // Mantém o selo "Time selecionado" da tela de login sempre coerente com
+    // o time realmente ativo (inclusive ao restaurar o time salvo no
+    // carregamento da página, não só ao trocar manualmente).
+    els.loginTeamName.textContent = team.nome;
   }
 
   function renderTeamList() {
@@ -528,6 +570,7 @@
     e.preventDefault();
     const email = els.loginEmail.value.trim();
     const senha = els.loginPassword.value;
+    setLoginSubmitting(true);
     try {
       const result = await Api.login(email, senha);
       if (result.papel !== 'admin') {
@@ -540,7 +583,18 @@
       enterDashboard();
     } catch (err) {
       toast(err.message, 'error');
+    } finally {
+      setLoginSubmitting(false);
     }
+  }
+
+  // Dá retorno visual imediato ao tocar em "Entrar" — sem isso, o botão
+  // ficava "parado" durante o tempo de resposta do backend, e não dava pra
+  // saber se o toque tinha sido registrado ou se estava carregando.
+  function setLoginSubmitting(isSubmitting) {
+    els.loginSubmitButton.disabled = isSubmitting;
+    els.loginSubmitText.textContent = isSubmitting ? 'Entrando…' : 'Entrar';
+    els.loginSubmitSpinner.classList.toggle('hidden', !isSubmitting);
   }
 
   function onLogout() {
@@ -582,11 +636,7 @@
   async function loadAll() {
     beginLoading();
     try {
-      const [clientes, projetos, colaboradores] = await Promise.all([
-        Api.listClientes(state.session),
-        Api.listProjetos(state.session),
-        Api.listColaboradores(state.session),
-      ]);
+      const { clientes, projetos, colaboradores } = await Api.loadDashboardInit(state.session);
       state.clientes = clientes;
       state.projetos = projetos;
       state.colaboradores = colaboradores;
@@ -602,6 +652,7 @@
         onLogout();
       } else {
         toast(`Erro ao carregar dados: ${err.message}`, 'error');
+        showLoadFailure(`Não deu para carregar os dados: ${err.message}`, loadAll);
       }
     } finally {
       endLoading();
@@ -3248,6 +3299,7 @@ ${panelsHtml}
         onLogout();
       } else {
         toast(`Erro ao carregar apontamentos: ${err.message}`, 'error');
+        showLoadFailure(`Não deu para carregar os apontamentos: ${err.message}`, loadApontamentos);
       }
     } finally {
       endLoading();

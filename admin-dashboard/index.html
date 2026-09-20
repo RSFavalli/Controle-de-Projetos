@@ -97,8 +97,9 @@
     <!-- Movido via JS para dentro da aba ativa enquanto ela carrega dados —
          ver beginLoading/endLoading em js/app.js. -->
     <div id="tabLoadingOverlay" class="tab-loading-overlay hidden" aria-hidden="true">
-      <span class="loading-spinner loading-spinner--lg"></span>
-      <span>Carregando…</span>
+      <span id="tabLoadingSpinner" class="loading-spinner loading-spinner--lg"></span>
+      <span id="tabLoadingText">Carregando…</span>
+      <button type="button" id="tabLoadingRetryButton" class="btn btn--start btn--small hidden">Tentar novamente</button>
     </div>
 
     <!-- ------------------------- Tela de seleção de time ------------------------- -->
@@ -114,6 +115,11 @@
 
     <!-- ------------------------------- Tela de login ------------------------------- -->
     <section id="loginScreen" class="card auth-card hidden">
+      <div class="team-badge">
+        <span class="team-badge__dot" aria-hidden="true"></span>
+        <span>Time selecionado: <strong id="loginTeamName">—</strong></span>
+        <button type="button" id="changeTeamButton" class="team-badge__change">Trocar de time</button>
+      </div>
       <h2>Entrar</h2>
       <p class="muted">Acesso restrito a colaboradores com perfil administrador.</p>
       <form id="loginForm" class="stacked-form">
@@ -125,9 +131,11 @@
           <label for="loginPassword">Senha</label>
           <input type="password" id="loginPassword" required autocomplete="current-password" />
         </div>
-        <button type="submit" class="btn btn--start">Entrar</button>
+        <button type="submit" id="loginSubmitButton" class="btn btn--start">
+          <span id="loginSubmitText">Entrar</span>
+          <span id="loginSubmitSpinner" class="loading-spinner hidden" aria-hidden="true"></span>
+        </button>
       </form>
-      <button id="changeTeamButton" class="link-button">Trocar de time</button>
     </section>
 
     <!-- ------------------------------ Dashboard ------------------------------ -->
