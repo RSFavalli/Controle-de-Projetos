@@ -155,6 +155,17 @@ h1, h2, h3 {
   color: var(--color-text-muted);
 }
 
+.app-header__team {
+  font-weight: 700;
+  color: var(--color-primary-dark);
+}
+
+.app-header__team::after {
+  content: ' · ';
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
 .app-header__session {
   display: flex;
   align-items: center;
@@ -210,6 +221,80 @@ h1, h2, h3 {
 
 .login-hint {
   margin-top: var(--space-3);
+}
+
+/* Selo "Time selecionado" no topo da tela de login — bem mais visível do
+   que um link discreto sozinho, pra nunca deixar dúvida sobre qual base
+   a pessoa está usando em campo. */
+.team-badge {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  background: var(--color-primary-light);
+  border: 1px solid var(--color-primary);
+  color: var(--color-primary-dark);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.85rem;
+  margin-bottom: var(--space-4);
+}
+
+.team-badge__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  flex: 0 0 auto;
+}
+
+.team-badge__change {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--color-primary-dark);
+  text-decoration: underline;
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* Spinner de carregamento reutilizado nos botões de login/sincronizar. */
+.loading-spinner {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  animation: loading-spin 0.7s linear infinite;
+  flex: 0 0 auto;
+}
+
+@keyframes loading-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Botões com texto + spinner lado a lado, sem "pular" de tamanho ao
+   entrar em carregamento. */
+#loginSubmitButton,
+#reauthSubmitButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+#loginSubmitButton .loading-spinner,
+#reauthSubmitButton .loading-spinner {
+  border-color: rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+}
+
+#syncButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
 }
 
 .inline-form__actions {
@@ -469,6 +554,11 @@ textarea {
 
 .entries-card__sync-status--pending {
   color: var(--color-warning);
+  font-weight: 600;
+}
+
+.entries-card__sync-status--synced {
+  color: var(--color-primary-dark);
   font-weight: 600;
 }
 

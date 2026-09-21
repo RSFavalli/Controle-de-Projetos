@@ -79,20 +79,31 @@
     teamList: document.getElementById('teamList'),
     teamTestResult: document.getElementById('teamTestResult'),
 
+    appHeaderTeam: document.getElementById('appHeaderTeam'),
+
     loginForm: document.getElementById('loginForm'),
     loginEmail: document.getElementById('loginEmail'),
     loginPassword: document.getElementById('loginPassword'),
     loginHint: document.getElementById('loginHint'),
+    loginTeamName: document.getElementById('loginTeamName'),
+    loginSubmitButton: document.getElementById('loginSubmitButton'),
+    loginSubmitText: document.getElementById('loginSubmitText'),
+    loginSubmitSpinner: document.getElementById('loginSubmitSpinner'),
     changeTeamButton: document.getElementById('changeTeamButton'),
 
     reauthForm: document.getElementById('reauthForm'),
     reauthPassword: document.getElementById('reauthPassword'),
+    reauthSubmitButton: document.getElementById('reauthSubmitButton'),
+    reauthSubmitText: document.getElementById('reauthSubmitText'),
+    reauthSubmitSpinner: document.getElementById('reauthSubmitSpinner'),
     cancelReauthButton: document.getElementById('cancelReauthButton'),
 
     sessionInfo: document.getElementById('sessionInfo'),
     sessionUserName: document.getElementById('sessionUserName'),
     syncStatus: document.getElementById('syncStatus'),
     syncButton: document.getElementById('syncButton'),
+    syncButtonText: document.getElementById('syncButtonText'),
+    syncButtonSpinner: document.getElementById('syncButtonSpinner'),
     logoutButton: document.getElementById('logoutButton'),
 
     toastArea: document.getElementById('toastArea'),
@@ -174,6 +185,13 @@
       ACTIVITIES: window.TEAMS_DATA.buildActivities(team),
       slugify: window.TEAMS_DATA.slugify,
     };
+    // Deixa visível em toda tela (login, reautenticação, app) qual time está
+    // ativo — sem isso, só dava pra saber olhando o link discreto "Trocar de
+    // time", e ninguém tinha um jeito de conferir qual base o app estava
+    // usando enquanto trabalhava.
+    els.loginTeamName.textContent = team.nome;
+    els.appHeaderTeam.textContent = team.nome;
+    els.appHeaderTeam.classList.remove('hidden');
   }
 
   function renderTeamList() {
@@ -195,6 +213,8 @@
     if (!team) return;
     els.teamTestResult.textContent = 'Conectando...';
     els.teamTestResult.className = 'config-test-result';
+    const teamButtons = Array.from(els.teamList.querySelectorAll('button'));
+    teamButtons.forEach((btn) => { btn.disabled = true; });
 
     // Mesmo sem conseguir confirmar a conexão agora, deixa continuar — quem
     // está em campo sem internet ainda precisa conseguir escolher o time e
@@ -206,6 +226,8 @@
     } catch (err) {
       els.teamTestResult.textContent = `Não foi possível confirmar a conexão agora (${err.message}). Você pode continuar offline.`;
       els.teamTestResult.classList.add('error');
+    } finally {
+      teamButtons.forEach((btn) => { btn.disabled = false; });
     }
 
     localStorage.setItem(TEAM_STORAGE_KEY, team.id);
@@ -290,12 +312,19 @@
 
   /* --------------------------------- Login --------------------------------- */
 
+  function setLoginSubmitting(isSubmitting) {
+    els.loginSubmitButton.disabled = isSubmitting;
+    els.loginSubmitText.textContent = isSubmitting ? 'Entrando…' : 'Entrar';
+    els.loginSubmitSpinner.classList.toggle('hidden', !isSubmitting);
+  }
+
   async function onLoginSubmit(e) {
     e.preventDefault();
     const email = els.loginEmail.value.trim();
     const senha = els.loginPassword.value;
     els.loginHint.textContent = '';
 
+    setLoginSubmitting(true);
     try {
       const profile = await Api.login(email, senha);
       await DB.cacheAuthSuccess(email, senha, profile);
@@ -312,7 +341,8 @@
         toast(err.message, 'error');
         return;
       }
-      // Sem conexão: tenta login offline com credencial já usada antes neste dispositivo.
+      // Sem conexão (ou o servidor demorou demais para responder): tenta
+      // login offline com credencial já usada antes neste dispositivo.
       const cachedProfile = await DB.verifyOfflineLogin(email, senha);
       if (cachedProfile) {
         DB.setSession(cachedProfile);
@@ -323,10 +353,12 @@
         enterApp(cachedProfile);
       } else {
         toast(
-          'Sem conexão com a internet e nenhum login salvo neste dispositivo para este e-mail. Conecte-se à internet pelo menos uma vez para habilitar o uso offline.',
+          `${err.message} Também não há login salvo neste dispositivo para este e-mail — conecte-se à internet pelo menos uma vez para habilitar o uso offline.`,
           'error'
         );
       }
+    } finally {
+      setLoginSubmitting(false);
     }
   }
 
@@ -352,12 +384,29 @@
 
   /* ------------------------------ Sincronização ----------------------------- */
 
+  function setSyncButtonLoading(isLoading) {
+    els.syncButton.disabled = isLoading;
+    els.syncButtonText.textContent = isLoading ? 'Sincronizando…' : 'Sincronizar';
+    els.syncButtonSpinner.classList.toggle('hidden', !isLoading);
+  }
+
+  function setReauthSubmitting(isSubmitting) {
+    els.reauthSubmitButton.disabled = isSubmitting;
+    els.reauthSubmitText.textContent = isSubmitting ? 'Confirmando…' : 'Confirmar';
+    els.reauthSubmitSpinner.classList.toggle('hidden', !isSubmitting);
+  }
+
   async function onSyncButtonClick() {
     const session = DB.getSession();
     if (!session) return;
     if (inMemorySenha) {
-      await syncData(session.email, inMemorySenha);
-      await syncEntries({ pull: true });
+      setSyncButtonLoading(true);
+      try {
+        await syncData(session.email, inMemorySenha);
+        await syncEntries({ pull: true });
+      } finally {
+        setSyncButtonLoading(false);
+      }
     } else {
       showScreen('reauth');
       els.reauthPassword.focus();
@@ -368,6 +417,7 @@
     e.preventDefault();
     const session = DB.getSession();
     const senha = els.reauthPassword.value;
+    setReauthSubmitting(true);
     try {
       const profile = await Api.login(session.email, senha);
       inMemorySenha = senha;
@@ -378,7 +428,9 @@
       await syncData(session.email, senha);
       await syncEntries({ pull: true });
     } catch (err) {
-      toast(err.isNetworkError ? 'Sem conexão. Tente novamente quando estiver online.' : err.message, 'error');
+      toast(err.isNetworkError ? `${err.message} Tente novamente quando estiver online.` : err.message, 'error');
+    } finally {
+      setReauthSubmitting(false);
     }
   }
 
@@ -392,7 +444,7 @@
     } catch (err) {
       updateSyncStatusUi();
       if (!opts.silent) {
-        toast(err.isNetworkError ? 'Sem conexão para sincronizar agora. Os dados salvos localmente continuam disponíveis.' : err.message, 'error');
+        toast(err.isNetworkError ? `${err.message} Os dados salvos localmente continuam disponíveis.` : err.message, 'error');
       }
     }
   }
@@ -406,7 +458,7 @@
     const date = new Date(last);
     const hh = String(date.getHours()).padStart(2, '0');
     const mm = String(date.getMinutes()).padStart(2, '0');
-    els.syncStatus.textContent = `Sincronizado às ${hh}:${mm}`;
+    els.syncStatus.textContent = `✓ Sincronizado às ${hh}:${mm}`;
   }
 
   /* ------------------------ Sincronização de apontamentos ------------------------ */
@@ -458,7 +510,7 @@
       updateEntriesSyncStatusUi();
       if (!opts.silent) {
         toast(
-          err.isNetworkError ? 'Sem conexão para sincronizar os apontamentos agora.' : err.message,
+          err.isNetworkError ? `${err.message} Os apontamentos continuam salvos neste dispositivo.` : err.message,
           'error'
         );
       }
@@ -483,10 +535,12 @@
     const pendingCount = DB.getUnsyncedEntries(session.id).length + DB.getPendingDeletes().length;
     els.entriesSyncStatus.classList.toggle('entries-card__sync-status--pending', pendingCount > 0);
     if (pendingCount > 0) {
-      els.entriesSyncStatus.textContent = `${pendingCount} pendente(s) de sincronização`;
+      els.entriesSyncStatus.classList.remove('entries-card__sync-status--synced');
+      els.entriesSyncStatus.textContent = `${pendingCount} pendente(s) de sincronização com o servidor`;
     } else {
       const last = DB.getLastEntriesSync();
-      els.entriesSyncStatus.textContent = last ? 'Apontamentos sincronizados' : 'Ainda não sincronizado';
+      els.entriesSyncStatus.classList.toggle('entries-card__sync-status--synced', !!last);
+      els.entriesSyncStatus.textContent = last ? '✓ Salvo e sincronizado com o servidor' : 'Salvo neste dispositivo — ainda não sincronizado';
     }
   }
 
@@ -589,6 +643,7 @@
 
     setFormLockedForRunning(true);
     refreshAppUi();
+    toast('Cronômetro iniciado — apontamento salvo neste dispositivo.', 'success');
     syncEntries({ silent: true });
   }
 
@@ -596,6 +651,7 @@
     const active = Timer.getActiveEntry();
     if (!active) return;
     Timer.stop(els.observations.value);
+    toast('Apontamento encerrado e salvo neste dispositivo.', 'success');
     setFormLockedForRunning(false);
     els.observations.value = '';
     els.clientSelect.value = '';
@@ -621,6 +677,7 @@
     }
     DB.deleteEntry(entryId);
     refreshAppUi();
+    toast('Apontamento excluído.', 'success');
     syncEntries({ silent: true });
   }
 

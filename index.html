@@ -35,7 +35,7 @@
       <span class="app-header__logo" aria-hidden="true">⏱</span>
       <div>
         <h1>Timesheet</h1>
-        <p class="app-header__subtitle">Apontamento de horas trabalhadas</p>
+        <p class="app-header__subtitle"><span id="appHeaderTeam" class="app-header__team hidden"></span>Apontamento de horas trabalhadas</p>
       </div>
     </div>
 
@@ -44,7 +44,10 @@
         <strong id="sessionUserName"></strong>
         <span id="syncStatus" class="sync-status"></span>
       </div>
-      <button id="syncButton" class="btn btn--ghost btn--small">Sincronizar</button>
+      <button id="syncButton" class="btn btn--ghost btn--small">
+        <span id="syncButtonText">Sincronizar</span>
+        <span id="syncButtonSpinner" class="loading-spinner hidden" aria-hidden="true"></span>
+      </button>
       <button id="logoutButton" class="btn btn--ghost btn--small">Sair</button>
     </div>
   </header>
@@ -65,6 +68,11 @@
 
     <!-- ------------------------------- Tela de login ------------------------------- -->
     <section id="loginScreen" class="card auth-card hidden">
+      <div class="team-badge">
+        <span class="team-badge__dot" aria-hidden="true"></span>
+        <span>Time selecionado: <strong id="loginTeamName">—</strong></span>
+        <button type="button" id="changeTeamButton" class="team-badge__change">Trocar de time</button>
+      </div>
       <h2>Entrar</h2>
       <p class="muted">Use o e-mail e senha cadastrados pelo administrador.</p>
       <form id="loginForm" class="stacked-form">
@@ -76,10 +84,12 @@
           <label for="loginPassword">Senha</label>
           <input type="password" id="loginPassword" required autocomplete="current-password" />
         </div>
-        <button type="submit" class="btn btn--start">Entrar</button>
+        <button type="submit" id="loginSubmitButton" class="btn btn--start">
+          <span id="loginSubmitText">Entrar</span>
+          <span id="loginSubmitSpinner" class="loading-spinner hidden" aria-hidden="true"></span>
+        </button>
       </form>
       <p id="loginHint" class="muted login-hint"></p>
-      <button id="changeTeamButton" class="link-button">Trocar de time</button>
     </section>
 
     <!-- --------------------------- Reautenticação p/ sincronizar --------------------------- -->
@@ -92,7 +102,10 @@
           <input type="password" id="reauthPassword" required autocomplete="current-password" />
         </div>
         <div class="inline-form__actions">
-          <button type="submit" class="btn btn--start">Confirmar</button>
+          <button type="submit" id="reauthSubmitButton" class="btn btn--start">
+            <span id="reauthSubmitText">Confirmar</span>
+            <span id="reauthSubmitSpinner" class="loading-spinner hidden" aria-hidden="true"></span>
+          </button>
           <button type="button" id="cancelReauthButton" class="btn btn--ghost">Cancelar</button>
         </div>
       </form>
