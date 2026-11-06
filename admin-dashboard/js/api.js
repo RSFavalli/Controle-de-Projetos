@@ -113,8 +113,6 @@ const Api = (() => {
 
     gerarResumoIA: (session) => call('gerarResumoIA', session),
 
-    contarApontamentosPorPeriodo: (session, desde, ate) => call('contarApontamentosPorPeriodo', { ...session, desde, ate }),
-    excluirApontamentosPorPeriodo: (session, desde, ate) => call('excluirApontamentosPorPeriodo', { ...session, desde, ate }),
 
     listCenarios: (session) => call('listCenarios', session),
     saveCenario: (session, cenario) => call('saveCenario', { ...session, cenario }),

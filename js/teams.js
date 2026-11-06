@@ -71,6 +71,28 @@ const TEAMS = [
   },
 ];
 
+// Time do tipo "trator": backend próprio (Apps Script + planilha publicados por
+// você — veja backend/trator/SETUP-TRATOR.md), atividades e cargos não se aplicam
+// (os cadastros ficam nas Listas do próprio dashboard). A apiUrl fica vazia de
+// propósito: o dashboard pede a URL do Web App na primeira vez e a guarda neste
+// navegador. Se preferir fixar aqui, cole a URL em apiUrl.
+//
+// Fica FORA de TEAMS de propósito: TEAMS são os times do Timesheet (cronômetro por
+// cliente/projeto/atividade). O Trator Autônomo tem fluxo próprio de turnos e
+// eventos (js/trator-app.js). O app de campo lista FIELD_TEAMS; o Dashboard Admin
+// lista ADMIN_TEAMS.
+const TEAM_TRATOR = {
+  id: 'trator-autonomo',
+  nome: 'Trator Autônomo',
+  tipo: 'trator',
+  apiUrl: '',
+  activities: [],
+  cargos: [],
+};
+
+const ADMIN_TEAMS = TEAMS.concat([TEAM_TRATOR]);
+const FIELD_TEAMS = TEAMS.concat([TEAM_TRATOR]);
+
 function slugify(text) {
   return text
     .toString()
@@ -83,7 +105,7 @@ function slugify(text) {
 }
 
 function getTeamById(id) {
-  return TEAMS.find((t) => t.id === id) || null;
+  return ADMIN_TEAMS.find((t) => t.id === id) || null;
 }
 
 /** Monta a lista ACTIVITIES (id/name/order) de um time, no mesmo
@@ -98,6 +120,8 @@ function buildActivities(team) {
 
 window.TEAMS_DATA = {
   TEAMS,
+  ADMIN_TEAMS,
+  FIELD_TEAMS,
   slugify,
   getTeamById,
   buildActivities,

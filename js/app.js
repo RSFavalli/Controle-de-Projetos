@@ -107,6 +107,7 @@
     logoutButton: document.getElementById('logoutButton'),
 
     toastArea: document.getElementById('toastArea'),
+    tratorApp: document.getElementById('tratorApp'),
   };
 
   /* ---------------------------- Setup inicial ---------------------------- */
@@ -173,13 +174,26 @@
     if (!teamId) return null;
     const team = window.TEAMS_DATA.getTeamById(teamId);
     if (!team) return null;
+    // Time sem URL fixa em teams.js (Trator Autônomo): usa a URL guardada neste aparelho.
+    if (!teamApiUrl(team)) return null;
     activateTeam(team);
     return team;
   }
 
+  // URL do Web App do time: a de teams.js ou, se estiver vazia, a que foi informada
+  // uma vez neste aparelho (mesma chave que o Dashboard Admin usa).
+  function teamApiUrl(team) {
+    return team.apiUrl || localStorage.getItem('team_api_url_' + team.id) || '';
+  }
+
+  function isTrator() {
+    return !!currentTeam && currentTeam.tipo === 'trator';
+  }
+
   function activateTeam(team) {
     currentTeam = team;
-    Api.setBaseUrl(team.apiUrl);
+    document.body.dataset.teamTipo = team.tipo || '';
+    Api.setBaseUrl(teamApiUrl(team));
     DB.setActiveTeam(team.id);
     window.APP_DATA = {
       ACTIVITIES: window.TEAMS_DATA.buildActivities(team),
@@ -196,7 +210,7 @@
 
   function renderTeamList() {
     els.teamList.innerHTML = '';
-    window.TEAMS_DATA.TEAMS.forEach((team) => {
+    (window.TEAMS_DATA.FIELD_TEAMS || window.TEAMS_DATA.TEAMS).forEach((team) => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'btn btn--start';
@@ -216,16 +230,39 @@
     const teamButtons = Array.from(els.teamList.querySelectorAll('button'));
     teamButtons.forEach((btn) => { btn.disabled = true; });
 
+    // Time sem URL fixa (Trator Autônomo): pede a URL do Web App na primeira vez
+    // neste aparelho e só guarda se o servidor responder.
+    let url = teamApiUrl(team);
+    let urlNova = false;
+    if (!url) {
+      const digitada = (window.prompt(`Cole o endereço (URL) do Web App do time "${team.nome}". Peça ao administrador. Só é necessário uma vez neste aparelho.`) || '').trim();
+      if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/\s]+\/exec(\?.*)?$/.test(digitada)) {
+        els.teamTestResult.textContent = 'URL não informada ou inválida. Ela deve começar com https://script.google.com/macros/s/ e terminar com /exec.';
+        els.teamTestResult.classList.add('error');
+        teamButtons.forEach((btn) => { btn.disabled = false; });
+        return;
+      }
+      url = digitada;
+      urlNova = true;
+    }
+
     // Mesmo sem conseguir confirmar a conexão agora, deixa continuar — quem
     // está em campo sem internet ainda precisa conseguir escolher o time e
     // usar o app offline (sincroniza quando a conexão voltar).
     try {
-      await Api.ping(team.apiUrl);
+      await Api.ping(url);
+      if (urlNova) localStorage.setItem('team_api_url_' + team.id, url);
       els.teamTestResult.textContent = `Conectado ao time ${team.nome}.`;
       els.teamTestResult.classList.add('ok');
     } catch (err) {
       els.teamTestResult.textContent = `Não foi possível confirmar a conexão agora (${err.message}). Você pode continuar offline.`;
       els.teamTestResult.classList.add('error');
+      // URL digitada agora e que não respondeu: não guarda (pode estar errada).
+      if (urlNova) {
+        els.teamTestResult.textContent = `Não foi possível conectar nessa URL (${err.message}). Confira o endereço e tente de novo.`;
+        teamButtons.forEach((btn) => { btn.disabled = false; });
+        return;
+      }
     } finally {
       teamButtons.forEach((btn) => { btn.disabled = false; });
     }
@@ -254,6 +291,7 @@
   function wireHandlers() {
     els.loginForm.addEventListener('submit', onLoginSubmit);
     els.changeTeamButton.addEventListener('click', () => {
+      if (window.TratorApp) window.TratorApp.leave();
       renderTeamList();
       showScreen('team');
     });
@@ -286,7 +324,8 @@
     els.teamScreen.classList.toggle('hidden', name !== 'team');
     els.loginScreen.classList.toggle('hidden', name !== 'login');
     els.reauthScreen.classList.toggle('hidden', name !== 'reauth');
-    els.appScreen.classList.toggle('hidden', name !== 'app');
+    els.appScreen.classList.toggle('hidden', name !== 'app' || isTrator());
+    els.tratorApp.classList.toggle('hidden', name !== 'app' || !isTrator());
     els.sessionInfo.classList.toggle('hidden', name !== 'app');
   }
 
@@ -363,6 +402,7 @@
   }
 
   function onLogout() {
+    if (window.TratorApp) window.TratorApp.leave();
     inMemorySenha = null;
     DB.clearSession();
     DB.clearSenhaDispositivo();
@@ -374,6 +414,20 @@
   function enterApp(session) {
     showScreen('app');
     els.sessionUserName.textContent = session.nome;
+    if (isTrator()) {
+      // Time Trator Autônomo: fluxo próprio de turnos/eventos (js/trator-app.js).
+      if (alertsIntervalId) { clearInterval(alertsIntervalId); alertsIntervalId = null; }
+      window.TratorApp.enter({
+        session: session,
+        getSenha: () => inMemorySenha || DB.getSenhaDispositivo(),
+        toast: toast,
+        onAuthError: () => onLogout(),
+        requestPassword: () => { showScreen('reauth'); els.reauthPassword.focus(); },
+        setSyncStatus: (txt) => { els.syncStatus.textContent = txt; },
+      });
+      return;
+    }
+    if (window.TratorApp) window.TratorApp.leave();
     populateClientSelect();
     updateSyncStatusUi();
     refreshAppUi();
@@ -399,6 +453,20 @@
   async function onSyncButtonClick() {
     const session = DB.getSession();
     if (!session) return;
+    if (isTrator()) {
+      if (!inMemorySenha && !DB.getSenhaDispositivo()) {
+        showScreen('reauth');
+        els.reauthPassword.focus();
+        return;
+      }
+      setSyncButtonLoading(true);
+      try {
+        await window.TratorApp.sync({ manual: true });
+      } finally {
+        setSyncButtonLoading(false);
+      }
+      return;
+    }
     if (inMemorySenha) {
       setSyncButtonLoading(true);
       try {
@@ -425,6 +493,10 @@
       await DB.cacheAuthSuccess(session.email, senha, profile);
       els.reauthPassword.value = '';
       showScreen('app');
+      if (isTrator()) {
+        await window.TratorApp.sync({ manual: true });
+        return;
+      }
       await syncData(session.email, senha);
       await syncEntries({ pull: true });
     } catch (err) {
@@ -435,6 +507,7 @@
   }
 
   async function syncData(email, senha, opts = {}) {
+    if (isTrator()) return;
     try {
       const [clientes, projetos] = await Promise.all([Api.listClientes(email, senha), Api.listProjetos(email, senha)]);
       DB.setSyncedData(clientes, projetos);
@@ -472,6 +545,7 @@
   // não em toda ação isolada (iniciar/encerrar/editar), pra não buscar o
   // período inteiro de novo a cada clique.
   async function syncEntries(opts = {}) {
+    if (isTrator()) return;
     const session = DB.getSession();
     if (!session || !inMemorySenha) return;
 
@@ -480,7 +554,7 @@
     const temPendente = pending.length > 0 || deletedIds.length > 0;
 
     if (!temPendente && !opts.pull) {
-      if (!opts.silent) toast('Nenhum apontamento pendente de sincronização.', 'success');
+      if (!opts.silent) toast('Nenhum registro pendente de sincronização.', 'success');
       updateEntriesSyncStatusUi();
       return;
     }
@@ -504,13 +578,13 @@
       updateEntriesSyncStatusUi();
       renderEntries();
       if (!opts.silent) {
-        toast(temPendente ? `${pending.length} apontamento(s) sincronizado(s).` : 'Apontamentos atualizados.', 'success');
+        toast(temPendente ? `${pending.length} registro(s) sincronizado(s).` : 'Registros atualizados.', 'success');
       }
     } catch (err) {
       updateEntriesSyncStatusUi();
       if (!opts.silent) {
         toast(
-          err.isNetworkError ? `${err.message} Os apontamentos continuam salvos neste dispositivo.` : err.message,
+          err.isNetworkError ? `${err.message} Os registros continuam salvos neste dispositivo.` : err.message,
           'error'
         );
       }
@@ -643,7 +717,7 @@
 
     setFormLockedForRunning(true);
     refreshAppUi();
-    toast('Cronômetro iniciado — apontamento salvo neste dispositivo.', 'success');
+    toast('Cronômetro iniciado — registro salvo neste dispositivo.', 'success');
     syncEntries({ silent: true });
   }
 
@@ -651,7 +725,7 @@
     const active = Timer.getActiveEntry();
     if (!active) return;
     Timer.stop(els.observations.value);
-    toast('Apontamento encerrado e salvo neste dispositivo.', 'success');
+    toast('Registro encerrado e salvo neste dispositivo.', 'success');
     setFormLockedForRunning(false);
     els.observations.value = '';
     els.clientSelect.value = '';
@@ -669,7 +743,7 @@
   }
 
   function onDeleteEntry(entryId) {
-    const confirmed = confirm('Excluir este apontamento? Essa ação não pode ser desfeita.');
+    const confirmed = confirm('Excluir este registro? Essa ação não pode ser desfeita.');
     if (!confirmed) return;
     const entry = DB.getEntries().find((e) => e.id === entryId);
     if (entry && entry.syncedAt) {
@@ -677,7 +751,7 @@
     }
     DB.deleteEntry(entryId);
     refreshAppUi();
-    toast('Apontamento excluído.', 'success');
+    toast('Registro excluído.', 'success');
     syncEntries({ silent: true });
   }
 
@@ -739,7 +813,7 @@
   }
 
   function openEditEntryForm(entry) {
-    els.editEntryFormTitle.textContent = 'Editar apontamento';
+    els.editEntryFormTitle.textContent = 'Editar registro';
     els.editEntryId.value = entry.id;
     els.editEntryDate.value = entry.date;
     populateEditClientSelect(entry.clientId);
@@ -762,7 +836,7 @@
   // pra corrigir apontamentos já existentes, nunca criar um que nunca chegou
   // a ser feito.
   function openAddEntryForm(dateStr) {
-    els.editEntryFormTitle.textContent = `Adicionar apontamento — ${formatDiaLabel(dateStr)}`;
+    els.editEntryFormTitle.textContent = `Adicionar registro — ${formatDiaLabel(dateStr)}`;
     els.editEntryId.value = '';
     els.editEntryDate.value = dateStr;
     populateEditClientSelect('');
@@ -852,7 +926,7 @@
     DB.saveEntry(entry);
     closeEditEntryForm();
     refreshAppUi();
-    toast(isNovo ? 'Apontamento adicionado com sucesso.' : 'Apontamento atualizado com sucesso.', 'success');
+    toast(isNovo ? 'Registro adicionado com sucesso.' : 'Registro atualizado com sucesso.', 'success');
     syncEntries({ silent: true });
   }
 
@@ -938,7 +1012,7 @@
 
     const alvo = outrosDias[outrosDias.length - 1];
     const extra = outrosDias.length > 1 ? ` (e mais ${outrosDias.length - 1} dia(s))` : '';
-    hintEl.textContent = `⚠ Há apontamento(s) pendente(s) de sincronização em outro dia. Toque aqui para ver ${formatDiaLabel(alvo)}${extra}.`;
+    hintEl.textContent = `⚠ Há registro(s) pendente(s) de sincronização em outro dia. Toque aqui para ver ${formatDiaLabel(alvo)}${extra}.`;
     hintEl.classList.remove('hidden');
     hintEl.onclick = () => goToEntriesDay(alvo);
   }
@@ -955,7 +1029,7 @@
 
     els.entriesTableBody.innerHTML = '';
     els.entriesEmptyState.textContent =
-      viewDate === Timer.todayDateStr() ? 'Nenhum apontamento registrado hoje ainda.' : 'Nenhum apontamento registrado neste dia.';
+      viewDate === Timer.todayDateStr() ? 'Nenhum registro feito hoje ainda.' : 'Nenhum registro feito neste dia.';
     els.entriesEmptyState.classList.toggle('hidden', entries.length !== 0);
 
     let totalMinutes = 0;
@@ -989,14 +1063,14 @@
         const editBtn = document.createElement('button');
         editBtn.type = 'button';
         editBtn.className = 'row-actions__edit';
-        editBtn.title = 'Editar apontamento';
+        editBtn.title = 'Editar registro';
         editBtn.textContent = 'Editar';
         editBtn.addEventListener('click', () => openEditEntryForm(entry));
         rowActions.appendChild(editBtn);
 
         const delBtn = document.createElement('button');
         delBtn.type = 'button';
-        delBtn.title = 'Excluir apontamento';
+        delBtn.title = 'Excluir registro';
         delBtn.textContent = '🗑';
         delBtn.addEventListener('click', () => onDeleteEntry(entry.id));
         rowActions.appendChild(delBtn);
@@ -1019,7 +1093,7 @@
       const div = document.createElement('div');
       div.className = 'alert alert--danger';
       div.innerHTML = `
-        <strong>Apontamento sem encerramento encontrado</strong>
+        <strong>Registro sem encerramento encontrado</strong>
         <span>${escapeHtml(entry.clientName)} · ${escapeHtml(entry.projectName)} · ${escapeHtml(entry.activityName)} — iniciado em ${entry.date} às ${entry.startTime} e nunca encerrado.</span>
       `;
       const actions = document.createElement('div');
@@ -1088,7 +1162,7 @@
     els.statusBar.classList.toggle('offline', !online);
     els.connectionText.textContent = online
       ? 'Online — dados salvos localmente'
-      : 'Offline — seus apontamentos continuam sendo salvos neste dispositivo';
+      : 'Offline — seus registros continuam sendo salvos neste dispositivo';
 
     // Volta a conexão: tenta sincronizar sozinho se já tiver a senha em memória.
     if (online) {

@@ -12,17 +12,20 @@
  * ------------------------------------------------------------------
  */
 
-const CACHE_NAME = 'timesheet-cache-v5';
+const CACHE_NAME = 'timesheet-cache-v6';
 
 const APP_SHELL_FILES = [
   './',
   './index.html',
   './manifest.json',
   './css/styles.css',
+  './css/trator-app.css',
+  './js/teams.js',
   './js/data.js',
   './js/db.js',
   './js/api.js',
   './js/timer.js',
+  './js/trator-app.js',
   './js/app.js',
   './icons/icon-192.png',
   './icons/icon-512.png',

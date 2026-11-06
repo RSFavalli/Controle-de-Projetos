@@ -85,6 +85,17 @@ const Holidays = (() => {
     return feriados.indexOf(ds) === -1;
   }
 
+  /** Feriado (nacional ou de Paulínia) em qualquer dia da semana — inclusive
+   * sábado ou domingo, diferente de !isBusinessDay (que também é true p/ fim
+   * de semana). Usado pela aba Análise de Projeto. */
+  function isHoliday(dateOrStr) {
+    const date = typeof dateOrStr === 'string' ? parseDateStr(dateOrStr) : dateOrStr;
+    const ds = dateStr(date);
+    if (EXTRA_DIAS_NAO_UTEIS.indexOf(ds) !== -1) return true;
+    const year = date.getFullYear();
+    return feriadosNacionais(year).concat(feriadosPaulinia(year)).map(dateStr).indexOf(ds) !== -1;
+  }
+
   function parseDateStr(s) {
     const [y, m, d] = s.split('-').map(Number);
     return new Date(y, m - 1, d);
@@ -103,6 +114,7 @@ const Holidays = (() => {
 
   return {
     isBusinessDay,
+    isHoliday,
     lastBusinessDays,
     dateStr,
     parseDateStr,

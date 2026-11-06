@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Timesheet - Apontamento de Horas</title>
-  <meta name="description" content="Sistema de apontamento de horas trabalhadas, offline-first." />
+  <title>Timesheet - Registro de Tempo das Atividades</title>
+  <meta name="description" content="Sistema de registro de tempo das atividades, offline-first." />
   <meta name="theme-color" content="#1f6f54" />
 
   <!-- PWA -->
@@ -13,6 +13,7 @@
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
 
   <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/trator-app.css" />
 </head>
 <body>
 
@@ -35,7 +36,7 @@
       <span class="app-header__logo" aria-hidden="true">⏱</span>
       <div>
         <h1>Timesheet</h1>
-        <p class="app-header__subtitle"><span id="appHeaderTeam" class="app-header__team hidden"></span>Apontamento de horas trabalhadas</p>
+        <p class="app-header__subtitle"><span id="appHeaderTeam" class="app-header__team hidden"></span>Registro de tempo das atividades</p>
       </div>
     </div>
 
@@ -166,7 +167,7 @@
       <!-- Apontamentos do dia -->
       <section class="card entries-card" aria-labelledby="entriesHeading">
         <div class="entries-card__header">
-          <h2 id="entriesHeading">Apontamentos</h2>
+          <h2 id="entriesHeading">Registros do dia</h2>
           <div class="entries-card__header-right">
             <span id="entriesSyncStatus" class="entries-card__sync-status"></span>
             <span id="todayTotal" class="entries-card__total">Total: 00:00</span>
@@ -179,14 +180,14 @@
           <button type="button" id="entriesDayNext" class="entries-day-nav__btn" aria-label="Ver próximo dia" disabled>›</button>
         </div>
         <p class="field-hint entries-day-nav__hint">
-          Esqueceu de apontar em outro dia? Use as setas <strong>‹ ›</strong> acima para ver e corrigir apontamentos de até 30 dias atrás.
+          Esqueceu de registrar em outro dia? Use as setas <strong>‹ ›</strong> acima para ver e corrigir registros de até 30 dias atrás.
         </p>
         <button type="button" id="entriesPendingElsewhereHint" class="entries-pending-hint hidden"></button>
 
-        <button type="button" id="addEntryButton" class="btn btn--ghost btn--small entries-add-btn">+ Adicionar apontamento neste dia</button>
+        <button type="button" id="addEntryButton" class="btn btn--ghost btn--small entries-add-btn">+ Adicionar registro neste dia</button>
 
         <form id="editEntryForm" class="edit-entry-form hidden">
-          <h3 id="editEntryFormTitle">Editar apontamento</h3>
+          <h3 id="editEntryFormTitle">Editar registro</h3>
           <input type="hidden" id="editEntryId" />
           <input type="hidden" id="editEntryDate" />
           <div class="field-grid">
@@ -240,12 +241,15 @@
             </tbody>
           </table>
           <p id="entriesEmptyState" class="empty-state hidden">
-            Nenhum apontamento registrado hoje ainda.
+            Nenhum registro feito hoje ainda.
           </p>
         </div>
       </section>
 
     </div>
+
+    <!-- ------------------- App do técnico (time Trator Autônomo) ------------------- -->
+    <section id="tratorApp" class="tr-app hidden" aria-label="App do técnico"></section>
   </main>
 
   <footer class="app-footer">
@@ -258,6 +262,7 @@
   <script src="js/db.js"></script>
   <script src="js/api.js"></script>
   <script src="js/timer.js"></script>
+  <script src="js/trator-app.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

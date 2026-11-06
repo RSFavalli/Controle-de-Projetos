@@ -1,0 +1,123 @@
+/* ==========================================================================
+   trator.css — telas da equipe "Trator Autônomo" (tipo "trator" em teams.js).
+   Reaproveita as classes do dashboard (card, panel-header, data-table,
+   inline-form, field, status-pill...). Aqui só o que é específico.
+   ========================================================================== */
+
+/* Menu lateral próprio da equipe: troca o menu de Registro de Tempo. */
+#tratorNav { display: none; }
+body[data-team-tipo="trator"] #tratorNav { display: flex; }
+body[data-team-tipo="trator"] .admin-sidebar > nav.tabs:not(#tratorNav) { display: none; }
+
+/* Nesta equipe só o painel dela aparece; nos demais times ele nunca aparece. */
+body[data-team-tipo="trator"] #dashboardScreen > :not(#tratorRoot) { display: none !important; }
+body:not([data-team-tipo="trator"]) #tratorRoot { display: none !important; }
+
+/* Botão do menu lateral (mesmo visual de .tab-button; classe própria para não
+   entrar nos atalhos do menu de Registro de Tempo). */
+.trnav-button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  text-align: left;
+  font-family: var(--f-display);
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.trnav-button:hover { background: var(--color-surface-2); color: var(--color-text); }
+.trnav-button.is-active { background: var(--color-primary-light); color: var(--color-primary-dark); }
+.trnav-button:focus-visible { outline: none; box-shadow: var(--glow-neon); }
+
+.tr-intro { margin: calc(var(--space-2) * -1) 0 var(--space-4); }
+
+/* Seletor de lista (segmentado, igual ao seletor de período). */
+.tr-seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm, 6px);
+  overflow: hidden;
+  margin-bottom: var(--space-4);
+}
+.tr-seg__btn {
+  appearance: none;
+  border: 0;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 7px 14px;
+  cursor: pointer;
+  border-right: 1px solid var(--color-border);
+}
+.tr-seg__btn:last-child { border-right: 0; }
+.tr-seg__btn:hover { background: var(--color-primary-light); }
+.tr-seg__btn.is-active { background: var(--color-primary); color: #fff; font-weight: 600; }
+.tr-seg__btn:focus-visible { outline: none; box-shadow: var(--glow-neon); position: relative; }
+
+.tr-lista-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+.tr-lista-topo > .muted { flex: 1 1 320px; max-width: 720px; margin: 0; }
+.tr-lista-acoes { display: flex; gap: var(--space-3); align-items: center; }
+.tr-lista-acoes input[type="search"] {
+  font: inherit;
+  font-size: 0.88rem;
+  padding: 7px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--color-surface);
+  color: var(--color-text);
+  min-width: 170px;
+}
+.tr-lista-acoes input[type="search"]:focus-visible { outline: none; box-shadow: var(--glow-neon); }
+
+.tr-form-titulo { margin: 0 0 var(--space-3); font-family: var(--f-display); font-size: 1rem; }
+.tr-erro {
+  margin: var(--space-2) 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--color-danger-light);
+  color: var(--color-danger);
+  font-size: 0.88rem;
+}
+.tr-contagem { margin-top: var(--space-3); }
+.tr-inativo td { opacity: 0.6; }
+.tr-inativo td:last-child, .tr-inativo td:nth-last-child(2) { opacity: 1; }
+
+/* Responsável (mesmas cores dos grupos nos gráficos). */
+.tr-pill {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.tr-pill--asi { background: #dff3ea; color: #12684a; }
+.tr-pill--cli { background: #fdf0cf; color: #7a5a00; }
+.tr-pill--aut { background: #dbe8f8; color: #245a9c; }
+.tr-pill--ng  { background: #e8edf0; color: #4a5963; }
+:root[data-theme="dark"] .tr-pill--asi { background: #123d2e; color: #7fe0bd; }
+:root[data-theme="dark"] .tr-pill--cli { background: #3a3016; color: #e8c15a; }
+:root[data-theme="dark"] .tr-pill--aut { background: #17324f; color: #9cc8ff; }
+:root[data-theme="dark"] .tr-pill--ng  { background: #262c25; color: #b8c2bd; }
+
+/* O formulário em linha é uma grade: título e aviso de erro ocupam a linha toda. */
+.inline-form .tr-form-titulo, .inline-form .tr-erro { grid-column: 1 / -1; }
+.inline-form .field-note { margin: 4px 0 0; font-size: 0.8rem; }

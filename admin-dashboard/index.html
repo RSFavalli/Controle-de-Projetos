@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" />
   <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/trator.css" />
   <script>
     // Aplica o tema salvo antes do primeiro paint, pra não piscar claro→escuro.
     (function () {
@@ -29,7 +30,7 @@
       <img class="admin-header__logo-exa" src="assets/Agricef - .png" alt="EXA — Experimentação Agrícola" />
       <div>
         <h1>Gestão de Pessoas</h1>
-        <p class="admin-header__subtitle">Clientes, projetos, colaboradores e apontamentos</p>
+        <p class="admin-header__subtitle">Clientes, projetos, colaboradores e registro de tempo</p>
       </div>
     </div>
     <div class="admin-header__actions">
@@ -73,11 +74,15 @@
         </button>
         <button class="tab-button" data-tab="apontamentos" role="tab">
           <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" stroke-linecap="round" stroke-linejoin="round" /></svg>
-          Apontamentos
+          Registro de Tempo
         </button>
         <button class="tab-button" data-tab="equipe" role="tab">
           <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 20c.5-3.4 3-5.3 5.5-5.3S13.5 16.6 14 20M8.5 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM14.5 9.5c1.6.3 2.8 1.7 3.1 3.6M15 6.3a2.4 2.4 0 1 1 0 4.7" stroke-linecap="round" stroke-linejoin="round" /><path d="M14.5 20c.4-2.8 2-4.3 4-4.3s3.4 1.4 4 3.9" stroke-linecap="round" stroke-linejoin="round" /></svg>
           Equipe
+        </button>
+        <button class="tab-button" data-tab="analise-projeto" role="tab">
+          <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3.5 20.5h17M6 17v-5M10.5 17V7.5M15 17v-7.5M19 17V4.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          Análise de Projeto
         </button>
         <button class="tab-button" data-tab="financeira" role="tab" id="financeiraTabButton">
           <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 3.5v17M16.5 6.8c0-1.5-1.6-2.6-4-2.6-2.7 0-4.5 1.3-4.5 3.1 0 4 8.5 1.9 8.5 5.9 0 1.9-1.9 3.2-4.5 3.2-2.4 0-4-1-4-2.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
@@ -86,6 +91,15 @@
         <button class="tab-button" data-tab="estrategia" role="tab" id="estrategiaTabButton">
           <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="0.9" fill="currentColor" stroke="none" /></svg>
           Estratégia
+        </button>
+      </nav>
+
+      <!-- Menu da equipe Trator Autônomo (tipo "trator"). Só aparece quando esse
+           time está ativo — veja css/trator.css e js/trator.js. -->
+      <nav class="tabs" id="tratorNav" role="tablist" aria-label="Menu da equipe Trator Autônomo">
+        <button type="button" class="trnav-button is-active" data-trator-tab="listas" role="tab">
+          <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8.5 6.5H20M8.5 12H20M8.5 17.5H20M4 6.5h.01M4 12h.01M4 17.5h.01" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          Listas
         </button>
       </nav>
     </aside>
@@ -141,9 +155,29 @@
     <!-- ------------------------------ Dashboard ------------------------------ -->
     <section id="dashboardScreen" class="hidden">
 
+      <!-- Painel da equipe Trator Autônomo — preenchido por js/trator.js. -->
+      <section id="tratorRoot" class="tab-panel card hidden"></section>
+
       <div class="tabs-bar">
         <button type="button" class="btn btn--ghost btn--small no-print" id="exportPdfButton">Exportar PDF</button>
         <button type="button" class="btn btn--ghost btn--small no-print" id="shareHtmlButton">Compartilhar em HTML</button>
+      </div>
+
+      <!-- Filtro GLOBAL de período — vale para todas as análises das abas
+           Registro de Tempo, Equipe, Financeira e Relatório individual. Ver
+           "Período global" em js/app.js. -->
+      <div id="periodoBar" class="periodo-bar no-print hidden" role="group" aria-label="Período analisado">
+        <span class="periodo-bar__titulo">Período analisado</span>
+        <div class="periodo-seg" role="radiogroup" aria-label="Tipo de período">
+          <button type="button" class="periodo-seg__btn" data-modo="mes" role="radio">Mês específico</button>
+          <button type="button" class="periodo-seg__btn" data-modo="ano" role="radio">Ano todo</button>
+          <button type="button" class="periodo-seg__btn" data-modo="tudo" role="radio">Desde o início até hoje</button>
+        </div>
+        <label for="periodoMesSelect" class="visually-hidden">Mês</label>
+        <select id="periodoMesSelect"></select>
+        <label for="periodoAnoSelect" class="visually-hidden">Ano</label>
+        <select id="periodoAnoSelect"></select>
+        <span id="periodoBarResumo" class="periodo-bar__resumo"></span>
       </div>
 
       <!-- Modal de seleção do que entra no arquivo HTML compartilhado — ver
@@ -151,16 +185,30 @@
       <div id="shareHtmlModal" class="modal-overlay hidden no-print">
         <div class="modal-card">
           <h3>Compartilhar em HTML</h3>
-          <p class="muted">Escolha o que vai entrar no arquivo.</p>
+          <p class="muted">Escolha o período e o que vai entrar no arquivo.</p>
+
+          <div class="share-html-periodo">
+            <p class="share-html-periodo__titulo">Período dos dados analisados</p>
+            <div class="share-html-periodo__opcoes">
+              <label><input type="radio" name="shareHtmlPeriodoModo" value="mes" checked /> Mês específico</label>
+              <label><input type="radio" name="shareHtmlPeriodoModo" value="ano" /> Ano todo</label>
+              <label><input type="radio" name="shareHtmlPeriodoModo" value="tudo" /> Desde o início do registro até hoje</label>
+            </div>
+            <div class="share-html-periodo__selects">
+              <select id="shareHtmlPeriodoMes" aria-label="Mês"></select>
+              <select id="shareHtmlPeriodoAno" aria-label="Ano"></select>
+            </div>
+            <p id="shareHtmlPeriodoResumo" class="muted share-html-periodo__resumo"></p>
+          </div>
 
           <div class="share-html-secoes">
-            <label><input type="checkbox" id="shareHtmlSecaoApontamentos" checked /> Apontamentos</label>
+            <label><input type="checkbox" id="shareHtmlSecaoApontamentos" checked /> Registro de Tempo</label>
             <label><input type="checkbox" id="shareHtmlSecaoEquipe" checked /> Equipe</label>
             <label id="shareHtmlSecaoFinanceiroWrap"><input type="checkbox" id="shareHtmlSecaoFinanceiro" checked /> Financeira e Estratégia</label>
           </div>
 
           <div id="shareHtmlColaboradoresWrap">
-            <p class="muted" style="margin-top: var(--space-4);">Em "Horas apontadas por dia", incluir:</p>
+            <p class="muted" style="margin-top: var(--space-4);">Em "Tempo registrado por dia", incluir:</p>
             <div class="share-html-colaboradores-actions">
               <button type="button" class="link-button" id="shareHtmlColaboradoresTodos">Selecionar todos</button>
               <button type="button" class="link-button" id="shareHtmlColaboradoresNenhum">Nenhum</button>
@@ -236,6 +284,10 @@
             <input type="number" id="projetoValorOrcado" min="0" step="100" placeholder="0 (opcional — deixe 0 para projetos internos)" />
           </div>
           <div class="field">
+            <label for="projetoHorasEstimadas">Horas estimadas</label>
+            <input type="number" id="projetoHorasEstimadas" min="0" step="1" placeholder="0 (opcional — dimensionamento do projeto)" />
+          </div>
+          <div class="field">
             <label for="projetoInicioPrevisto">Início previsto</label>
             <input type="month" id="projetoInicioPrevisto" />
           </div>
@@ -259,7 +311,7 @@
         <div class="table-wrapper">
           <table class="data-table">
             <thead>
-              <tr><th>Cliente</th><th>Projeto</th><th>Status</th><th></th></tr>
+              <tr><th>Cliente</th><th>Projeto</th><th>Horas estimadas</th><th>Status</th><th></th></tr>
             </thead>
             <tbody id="projetosTableBody"></tbody>
           </table>
@@ -313,7 +365,7 @@
             <label><input type="checkbox" id="colaboradorAtivo" checked /> Ativo</label>
           </div>
           <div class="field field--checkbox">
-            <label><input type="checkbox" id="colaboradorObrigatorioApontamento" checked /> Obrigado a apontar horas</label>
+            <label><input type="checkbox" id="colaboradorObrigatorioApontamento" checked /> Obrigado a registrar o tempo das atividades</label>
           </div>
           <div class="field field--checkbox">
             <label><input type="checkbox" id="colaboradorAcessoFinanceiro" /> Acesso à aba Financeira</label>
@@ -327,7 +379,7 @@
         <div class="table-wrapper">
           <table class="data-table">
             <thead>
-              <tr><th>Nome</th><th>E-mail</th><th>Cargo</th><th>Perfil</th><th>Apontamento</th><th>Status</th><th></th></tr>
+              <tr><th>Nome</th><th>E-mail</th><th>Cargo</th><th>Perfil</th><th>Registro de tempo</th><th>Status</th><th></th></tr>
             </thead>
             <tbody id="colaboradoresTableBody"></tbody>
           </table>
@@ -338,21 +390,21 @@
       <!-- ---------------- Apontamentos ---------------- -->
       <section id="tab-apontamentos" class="tab-panel card hidden">
         <div class="panel-header">
-          <h2>Apontamentos</h2>
+          <h2>Registro de Tempo</h2>
           <div class="panel-header__controls">
             <button class="btn btn--ghost btn--small" id="refreshApontamentosButton">Atualizar</button>
           </div>
         </div>
 
+        <p class="periodo-badge" data-periodo-badge></p>
+
         <div class="apontamentos-secao">
           <div class="panel-header">
             <div>
-              <h3 class="section-subheading" style="margin: 0;">Ranking da equipe</h3>
-              <p class="muted" style="margin-top: 4px;">Comparativo de todos os colaboradores ativos no mês selecionado.</p>
+              <h3 class="section-subheading" style="margin: 0;">Ranking da equipe <span class="periodo-tag" data-periodo-tag></span></h3>
+              <p class="muted" style="margin-top: 4px;">Comparativo de todos os colaboradores ativos no período selecionado.</p>
             </div>
             <div class="panel-header__controls">
-              <label for="rankingMesSelect" class="visually-hidden">Mês</label>
-              <select id="rankingMesSelect"></select>
               <label for="rankingComparativoSelect" class="visually-hidden">Comparar com</label>
               <select id="rankingComparativoSelect">
                 <option value="none">Sem comparativo</option>
@@ -363,11 +415,11 @@
               </select>
             </div>
           </div>
-          <p id="rankingEquipeEmptyState" class="empty-state hidden">Nenhum apontamento neste mês.</p>
+          <p id="rankingEquipeEmptyState" class="empty-state hidden">Nenhum registro neste período.</p>
           <div class="ranking-grid" id="rankingEquipeGrid">
             <div class="ranking-card">
               <h4>Quem trabalhou mais</h4>
-              <p class="muted">Total de horas apontadas no mês.</p>
+              <p class="muted">Total de horas registradas no período.</p>
               <ol class="ranking-list" id="rankMaisHorasList"></ol>
             </div>
             <div class="ranking-card">
@@ -376,13 +428,13 @@
               <ol class="ranking-list" id="rankPorAtividadeList"></ol>
             </div>
             <div class="ranking-card">
-              <h4>Quem apontou todos os dias úteis</h4>
-              <p class="muted" id="rankPresencaTotalDesc">100% de presença no mês (considera só quem é obrigado a apontar).</p>
+              <h4>Quem registrou todos os dias úteis</h4>
+              <p class="muted" id="rankPresencaTotalDesc">100% de presença no período (considera só quem é obrigado a registrar).</p>
               <div id="rankPresencaTotalContainer"></div>
             </div>
             <div class="ranking-card">
               <h4>Quem trabalhou mais fora do horário</h4>
-              <p class="muted">Horas apontadas em finais de semana e feriados.</p>
+              <p class="muted">Horas registradas em finais de semana e feriados.</p>
               <ol class="ranking-list" id="rankForaHorarioList"></ol>
             </div>
           </div>
@@ -391,17 +443,16 @@
         <div class="apontamentos-secao">
           <div class="panel-header">
             <div>
-              <h3 class="section-subheading" style="margin: 0;">Horas apontadas por dia</h3>
+              <h3 class="section-subheading" style="margin: 0;">Tempo registrado por dia <span class="periodo-tag" data-periodo-tag></span></h3>
               <p class="muted" style="margin-top: 4px;">
-                Visão mensal de quantas horas um colaborador apontou, dia a dia — ajuda a ver rápido quem deixou de
-                apontar num dia útil, ou trabalhou muito acima/abaixo do esperado.
+                Quantas horas um colaborador registrou no período — dia a dia quando o período é um mês; nos períodos
+                longos (ano todo ou desde o início), uma barra por mês com a média de horas por dia útil. Ajuda a ver
+                rápido quem deixou de registrar, ou trabalhou muito acima/abaixo do esperado.
               </p>
             </div>
             <div class="panel-header__controls">
               <label for="horasDiariasColaborador" class="visually-hidden">Colaborador</label>
               <select id="horasDiariasColaborador"></select>
-              <label for="horasDiariasMes" class="visually-hidden">Mês</label>
-              <select id="horasDiariasMes"></select>
             </div>
           </div>
           <div class="horas-diarias-filtro">
@@ -416,16 +467,16 @@
                HTML, pelo conteúdo de TODOS os colaboradores — ver
                Dashboard.buildTodosColaboradoresHorasDiariasHtml() em js/app.js. -->
           <div id="horasDiariasSecaoConteudo">
-            <p id="horasDiariasEmptyState" class="empty-state hidden">Nenhum apontamento concluído neste mês para este colaborador.</p>
+            <p id="horasDiariasEmptyState" class="empty-state hidden">Nenhum registro concluído neste período para este colaborador.</p>
 
-            <p class="muted"><strong>Situação do dia</strong> — cor conforme as horas apontadas frente à dedicação diária (linha tracejada).</p>
+            <p class="muted"><strong>Situação do dia</strong> — cor conforme as horas registradas frente à dedicação diária (linha tracejada).</p>
             <div class="chart-wrap">
-              <svg id="chartHorasDiariasStatus" height="260" viewBox="0 0 820 260" role="img" aria-label="Horas apontadas por dia, coloridas pela situação"></svg>
+              <svg id="chartHorasDiariasStatus" height="260" viewBox="0 0 820 260" role="img" aria-label="Tempo registrado por dia, colorido pela situação"></svg>
             </div>
             <div class="legend-row">
               <span><i style="background: var(--status-good)"></i>Na meta ou acima</span>
               <span><i style="background: var(--status-warning)"></i>Abaixo da meta</span>
-              <span><i style="background: var(--status-critical)"></i>Sem apontamento (dia útil)</span>
+              <span><i style="background: var(--status-critical)"></i>Sem registro (dia útil)</span>
               <span><i style="background: var(--weekend-band); border: 1px solid var(--color-border);"></i>Fim de semana</span>
               <span><i style="background: var(--holiday-band); border: 1px solid var(--color-border);"></i>Feriado</span>
               <span><i class="line"></i>Dedicação diária</span>
@@ -433,7 +484,7 @@
 
             <p class="muted" style="margin-top: var(--space-4);"><strong>Composição por atividade</strong> — mesmo eixo, mostrando em que a pessoa trabalhou naquele dia.</p>
             <div class="chart-wrap">
-              <svg id="chartHorasDiariasAtividade" height="260" viewBox="0 0 820 260" role="img" aria-label="Horas apontadas por dia, por atividade"></svg>
+              <svg id="chartHorasDiariasAtividade" height="260" viewBox="0 0 820 260" role="img" aria-label="Tempo registrado por dia, por atividade"></svg>
             </div>
             <div class="legend-row" id="legendHorasDiariasAtividade"></div>
           </div>
@@ -442,20 +493,13 @@
         <div class="apontamentos-secao">
           <div class="panel-header">
             <div>
-              <h3 class="section-subheading" style="margin: 0;">Conformidade de apontamento</h3>
+              <h3 class="section-subheading" style="margin: 0;">Conformidade de registro <span class="periodo-tag" data-periodo-tag></span></h3>
               <p class="muted" style="margin-top: 4px;">
-                Verificação automática: quem não apontou ou deixou uma atividade em aberto num dia útil recebe um
+                Verificação automática: quem não registrou ou deixou uma atividade em aberto num dia útil recebe um
                 lembrete por e-mail sozinho, todo fim de dia. Fins de semana e feriados (nacionais e de Paulínia/SP)
-                não contam. Este painel mostra a frequência de pendências para você avaliar quando vale um reforço manual.
+                não contam. Os dias sem registro são contados dentro do período selecionado (até ontem); as atividades
+                em aberto mostram a situação atual, independente do período. Em períodos longos, a situação (Atenção/Crítico) considera a proporção de dias sem registro, equivalente a um mês de 22 dias úteis.
               </p>
-            </div>
-            <div class="panel-header__controls">
-              <label for="apontamentosRangeSelect" class="visually-hidden">Período</label>
-              <select id="apontamentosRangeSelect">
-                <option value="15">Últimos 15 dias úteis</option>
-                <option value="30">Últimos 30 dias úteis</option>
-                <option value="60">Últimos 60 dias úteis</option>
-              </select>
             </div>
           </div>
           <div class="table-wrapper">
@@ -463,7 +507,7 @@
               <thead>
                 <tr>
                   <th>Colaborador</th>
-                  <th>Dias sem apontar</th>
+                  <th>Dias sem registrar</th>
                   <th>Atividades em aberto</th>
                   <th>Situação</th>
                   <th></th>
@@ -476,17 +520,59 @@
         </div>
 
         <div class="apontamentos-secao">
-          <h3 class="section-subheading">Filtrar horas por período, cliente e projeto</h3>
-          <p class="muted">Os três blocos abaixo (departamento, mapa de calor e distribuição por colaborador) respeitam este filtro.</p>
+          <div class="panel-header">
+            <div>
+              <h3 class="section-subheading" style="margin: 0;">Taxa de Aderência <span class="periodo-tag" data-periodo-tag></span></h3>
+              <p class="muted" style="margin-top: 4px;">
+                Quanto a equipe (e cada colaborador) vem registrando o tempo das atividades em todos os dias úteis.
+                O objetivo não é fiscalizar horário — é garantir uma base de dados completa, dia a dia, para estimar
+                com confiança quanto tempo as atividades realmente consomem e dimensionar melhor os próximos projetos.
+              </p>
+            </div>
+          </div>
+          <div class="kpi-grid">
+            <div class="kpi">
+              <span class="kpi__label">Aderência da equipe no período</span>
+              <span class="kpi__value" id="kpiAderenciaEquipeValue">—</span>
+              <span class="kpi__sub" id="kpiAderenciaEquipeSub"></span>
+            </div>
+            <div class="kpi">
+              <span class="kpi__label">Colaboradores em 100%</span>
+              <span class="kpi__value" id="kpiAderenciaEmDiaValue">—</span>
+              <span class="kpi__sub">de todos os obrigados a registrar, no período selecionado</span>
+            </div>
+            <div class="kpi kpi--warn">
+              <span class="kpi__label">Aderência mais baixa</span>
+              <span class="kpi__value" id="kpiAderenciaMinValue">—</span>
+              <span class="kpi__sub" id="kpiAderenciaMinSub"></span>
+            </div>
+          </div>
+          <p class="muted" style="margin-top: var(--space-3);" id="aderenciaTendenciaDesc">Tendência da aderência da equipe nos últimos 6 meses.</p>
+          <p id="aderenciaChartEmptyState" class="empty-state hidden">Ainda não há dados suficientes para esta análise.</p>
+          <div class="chart-wrap">
+            <svg id="chartAderenciaTendencia" height="130" viewBox="0 0 720 130" role="img" aria-label="Tendência mensal da aderência da equipe"></svg>
+          </div>
+          <div class="table-wrapper" style="margin-top: var(--space-4);">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Colaborador</th>
+                  <th>Dias úteis no período</th>
+                  <th>Dias com registro</th>
+                  <th>Aderência</th>
+                  <th>Situação</th>
+                </tr>
+              </thead>
+              <tbody id="aderenciaTableBody"></tbody>
+            </table>
+            <p id="aderenciaEmptyState" class="empty-state hidden">Nenhum colaborador ativo cadastrado ainda.</p>
+          </div>
+        </div>
+
+        <div class="apontamentos-secao">
+          <h3 class="section-subheading">Filtrar horas por cliente e projeto <span class="periodo-tag" data-periodo-tag></span></h3>
+          <p class="muted">Os três blocos abaixo (departamento, mapa de calor e distribuição por colaborador) respeitam o período analisado (filtro no topo da página) e este filtro de cliente e projeto.</p>
           <form id="horasFiltroForm" class="horas-filtro">
-            <div class="field">
-              <label for="horasFiltroDe">De</label>
-              <input type="date" id="horasFiltroDe" />
-            </div>
-            <div class="field">
-              <label for="horasFiltroAte">Até</label>
-              <input type="date" id="horasFiltroAte" />
-            </div>
             <div class="field">
               <label for="horasFiltroCliente">Cliente</label>
               <select id="horasFiltroCliente">
@@ -503,12 +589,12 @@
           </form>
 
           <h3 class="section-subheading">Distribuição de horas do departamento</h3>
-          <p id="departamentoChartEmptyState" class="empty-state hidden">Nenhum apontamento concluído no período/filtro selecionado.</p>
+          <p id="departamentoChartEmptyState" class="empty-state hidden">Nenhum registro concluído no período/filtro selecionado.</p>
           <div id="departamentoChartContainer" class="departamento-chart-container"></div>
 
           <h3 class="section-subheading">Mapa de calor — Colaboradores × Projetos</h3>
           <p class="muted">Horas de cada colaborador em cada projeto, respeitando os filtros acima. Quanto mais escura a célula, mais horas.</p>
-          <p id="heatmapEmptyState" class="empty-state hidden">Nenhum apontamento concluído no período/filtro selecionado.</p>
+          <p id="heatmapEmptyState" class="empty-state hidden">Nenhum registro concluído no período/filtro selecionado.</p>
           <div class="heatmap-wrap">
             <table class="heatmap" id="heatmapTable"></table>
           </div>
@@ -519,15 +605,8 @@
           </div>
 
           <h3 class="section-subheading">Distribuição de horas por colaborador</h3>
-          <p id="horasChartEmptyState" class="empty-state hidden">Nenhum apontamento concluído no período/filtro selecionado.</p>
+          <p id="horasChartEmptyState" class="empty-state hidden">Nenhum registro concluído no período/filtro selecionado.</p>
           <div id="horasChartContainer" class="horas-chart-container"></div>
-        </div>
-
-        <div class="apontamentos-secao">
-          <h3 class="section-subheading">Consumo de horas por projeto</h3>
-          <p class="muted">Total e composição por atividade de cada projeto — sempre com todo o histórico, independente dos filtros acima.</p>
-          <p id="projetoChartEmptyState" class="empty-state hidden">Nenhum apontamento concluído ainda.</p>
-          <div id="projetoChartContainer" class="horas-chart-container"></div>
         </div>
 
         <div class="apontamentos-secao">
@@ -540,41 +619,18 @@
           <button type="button" class="btn btn--start btn--small no-print" id="gerarResumoIAButton">Gerar resumo</button>
           <div id="resumoIAResultado" class="resumo-ia hidden"></div>
         </div>
-
-        <div class="apontamentos-secao apontamentos-secao--perigo">
-          <h3 class="section-subheading">Excluir apontamentos de um período</h3>
-          <p class="muted">
-            Útil pra limpar dados de treinamento/teste antes de começar a usar o sistema pra valer, sem deixar ruído
-            nas análises. <strong>A exclusão é permanente e não pode ser desfeita.</strong>
-          </p>
-          <div class="danger-zone no-print">
-            <div class="danger-zone__fields">
-              <div class="field">
-                <label for="excluirPeriodoDe">De</label>
-                <input type="date" id="excluirPeriodoDe" />
-              </div>
-              <div class="field">
-                <label for="excluirPeriodoAte">Até</label>
-                <input type="date" id="excluirPeriodoAte" />
-              </div>
-              <button type="button" class="btn btn--danger btn--small" id="excluirPeriodoButton">Excluir período</button>
-            </div>
-          </div>
-        </div>
       </section>
 
       <!-- ---------------- Equipe ---------------- -->
       <section id="tab-equipe" class="tab-panel card hidden">
         <div class="panel-header">
           <h2>Gestão e Dimensionamento de Equipe</h2>
-          <div class="panel-header__controls">
-            <label for="equipeAnoSelect" class="visually-hidden">Ano</label>
-            <select id="equipeAnoSelect"></select>
-          </div>
         </div>
 
+        <p class="periodo-badge" data-periodo-badge></p>
+
         <div class="panel-header">
-          <h3 class="section-subheading" style="margin: 0;">Capacidade do ano</h3>
+          <h3 class="section-subheading" style="margin: 0;">Capacidade do período</h3>
           <div class="teto-control">
             <label for="equipeTetoInput">Teto saudável</label>
             <input type="number" id="equipeTetoInput" value="90" min="50" max="100" step="1" />
@@ -605,12 +661,12 @@
           <div class="kpi">
             <span class="kpi__label">Colaboradores ativos</span>
             <span class="kpi__value" id="kpiColaboradoresAtivosValue">—</span>
-            <span class="kpi__sub">ativos e obrigados a apontar</span>
+            <span class="kpi__sub">ativos e obrigados a registrar</span>
           </div>
           <div class="kpi">
-            <span class="kpi__label">Projetos executados no ano</span>
+            <span class="kpi__label">Projetos executados no período</span>
             <span class="kpi__value" id="kpiProjetosExecutadosValue">—</span>
-            <span class="kpi__sub">com pelo menos 1 apontamento no ano</span>
+            <span class="kpi__sub">com pelo menos 1 registro no período</span>
           </div>
           <div class="kpi kpi--warn">
             <span class="kpi__label">Meses sobrecarregados</span>
@@ -619,80 +675,118 @@
           </div>
         </div>
         <div class="field-note">
-          Estes números consideram só colaboradores ativos <strong>obrigados a apontar horas</strong> — quem está
-          marcado como isento (geralmente gerência/coordenação, no cadastro de Colaboradores) fica de fora da
-          capacidade, do consumido e da ocupação desta aba. Isso evita que a dedicação diária de quem raramente
-          aponta infle a capacidade sem nunca aparecer como "consumido". A aba Financeira continua somando o custo
-          de todo mundo, isento ou não — salário é despesa real independente de apontar horas.
+          <strong>Capacidade, consumido e ocupação</strong> consideram só colaboradores ativos <strong>obrigados a registrar o tempo
+          das atividades</strong> — quem está marcado como isento (geralmente gerência/coordenação, no cadastro de
+          Colaboradores) ou está inativo não entra na capacidade, e por isso as horas dessas pessoas também ficam fora da
+          ocupação (mesma base de comparação). Já os gráficos de <strong>projetos, cargos, atividades, colaboradores e
+          projetos por mês</strong> contam as horas de <strong>todos</strong> que registraram, isentos e inativos inclusive.
+          A aba Financeira soma o custo de todo mundo, isento ou não.
         </div>
         <p class="muted" style="margin-top: var(--space-3);" id="equipeSobrecarregadosDetalhe"></p>
+        <p class="muted" id="equipeNotaForaOcupacao"></p>
 
-        <h3 class="section-subheading">Horas consumidas × disponíveis, mês a mês</h3>
+        <h3 class="section-subheading">Horas consumidas × limites, mês a mês</h3>
         <p class="muted">
-          Duas barras por mês: <strong>Disponível</strong> (capacidade saudável, considerando os dias úteis do
-          calendário) e <strong>Consumido</strong> (horas realmente apontadas, colorida conforme a situação frente
-          à capacidade líquida total).
+          Uma barra por mês com as horas <strong>consumidas</strong> (colorida conforme a situação frente à capacidade
+          líquida) e duas curvas de referência, em horas: o <strong>limite de 100%</strong> (capacidade líquida do mês,
+          considerando os dias úteis do calendário) e a <strong>ocupação desejada</strong> (teto saudável). No mês em andamento a
+          barra é hachurada e o contorno tracejado mostra a projeção de fechamento (veja a tendência abaixo).
         </p>
         <p id="equipeChartHorasEmptyState" class="empty-state hidden">Nenhum colaborador ativo cadastrado.</p>
         <div class="chart-wrap">
-          <svg id="equipeChartHoras" width="720" height="300" viewBox="0 0 720 300" role="img" aria-label="Horas consumidas por mês comparadas à capacidade saudável"></svg>
+          <svg id="equipeChartHoras" width="720" height="300" viewBox="0 0 720 300" role="img" aria-label="Horas consumidas por mês comparadas ao limite de 100% e à ocupação desejada"></svg>
         </div>
         <div class="legend-row">
-          <span><i style="background: var(--capacity-bar); border: 1px solid var(--capacity-bar-border);"></i>Disponível (capacidade saudável)</span>
-          <span><i style="background: var(--status-good)"></i>Consumido — até <span id="equipeLegendTetoGood">90</span>% da líquida</span>
-          <span><i style="background: var(--status-warning)"></i>Consumido — <span id="equipeLegendTetoWarn">90</span>–100% da líquida</span>
+          <span><i style="background: var(--status-good)"></i><span>Consumido — até <span id="equipeLegendTetoGood">90</span>% da líquida</span></span>
+          <span><i style="background: var(--status-warning)"></i><span>Consumido — <span id="equipeLegendTetoWarn">90</span>–100% da líquida</span></span>
           <span><i style="background: var(--status-critical)"></i>Consumido — acima de 100% da líquida</span>
+          <span><i class="hatch"></i>Mês em andamento (realizado até hoje; tracejado = projeção)</span>
+          <span style="color: var(--status-warning);"><i class="curva"></i><span>Ocupação desejada (<span id="equipeLegendTetoLine">90</span>%)</span></span>
+          <span style="color: var(--status-critical);"><i class="curva"></i>Limite 100% (capacidade líquida)</span>
         </div>
 
-        <p class="muted" style="margin-top: var(--space-4);">
-          Percentual consumido — mesma base de meses, mas em escala de 0–100% (painel separado, não uma segunda
-          escala no mesmo gráfico, pra não distorcer a leitura).
-        </p>
-        <div class="chart-wrap">
-          <svg id="equipeChartPct" width="720" height="130" viewBox="0 0 720 130" role="img" aria-label="Percentual da capacidade consumido por mês"></svg>
+        <div class="panel-header" style="margin-top: var(--space-5);">
+          <h3 class="section-subheading" style="margin: 0;" id="equipeTendenciaTitulo">Tendência do mês atual</h3>
+          <span id="equipeTendenciaBadge" class="tend-badge hidden"></span>
         </div>
-        <div class="legend-row">
-          <span><i class="solidline"></i>% da capacidade líquida consumido</span>
-          <span style="color: var(--status-warning);">┈┈ <span id="equipeLegendTetoLine">90</span>% (teto saudável)</span>
-          <span style="color: var(--status-critical);">┈┈ 100% (capacidade líquida total)</span>
+        <p id="equipeTendenciaEmptyState" class="empty-state hidden"></p>
+        <div id="equipeTendenciaConteudo">
+          <p class="muted" id="equipeTendenciaDescricao"></p>
+          <div class="kpi-grid">
+            <div class="kpi" id="equipeTendKpi1">
+              <span class="kpi__label" id="equipeTendKpi1Label">Realizado</span>
+              <span class="kpi__value" id="equipeTendKpi1Value">—</span>
+              <span class="kpi__sub" id="equipeTendKpi1Sub"></span>
+            </div>
+            <div class="kpi" id="equipeTendKpi2">
+              <span class="kpi__label" id="equipeTendKpi2Label">Projeção no fim do mês</span>
+              <span class="kpi__value accent" id="equipeTendKpi2Value">—</span>
+              <span class="kpi__sub" id="equipeTendKpi2Sub"></span>
+            </div>
+            <div class="kpi" id="equipeTendKpi3">
+              <span class="kpi__label" id="equipeTendKpi3Label">Frente ao desejado</span>
+              <span class="kpi__value" id="equipeTendKpi3Value">—</span>
+              <span class="kpi__sub" id="equipeTendKpi3Sub"></span>
+            </div>
+            <div class="kpi" id="equipeTendKpi4">
+              <span class="kpi__label" id="equipeTendKpi4Label">Frente ao limite 100%</span>
+              <span class="kpi__value" id="equipeTendKpi4Value">—</span>
+              <span class="kpi__sub" id="equipeTendKpi4Sub"></span>
+            </div>
+          </div>
+          <div class="chart-wrap" style="margin-top: var(--space-3);">
+            <svg id="equipeChartTendencia" width="720" height="300" viewBox="0 0 720 300" role="img" aria-label="Horas acumuladas no mês, projeção de fechamento e limites de ocupação"></svg>
+          </div>
+          <div class="legend-row">
+            <span><i class="solidline"></i>Acumulado realizado</span>
+            <span id="equipeLegendProjecao" style="color: var(--color-primary-dark);"><i class="curva"></i>Projeção (ritmo dos últimos 5 dias úteis)</span>
+            <span style="color: var(--status-warning);"><i class="curva"></i><span>Ocupação desejada (<span id="equipeLegendTetoTend">90</span>%)</span></span>
+            <span style="color: var(--status-critical);"><i class="curva"></i>Limite 100% (capacidade líquida)</span>
+            <span><i class="faixa-fds"></i>Fim de semana / feriado / emenda</span>
+          </div>
+          <p class="muted">
+            Selo: <strong>OK</strong> (fecha até o desejado), <strong>ATENÇÃO</strong> (entre o desejado e 100%) ou
+            <strong>CRÍTICO</strong> (acima de 100%). A projeção é uma estimativa: assume que o ritmo recente se mantém e muda
+            conforme novos registros entram. Considera só colaboradores ativos obrigados a registrar, como a capacidade.
+          </p>
         </div>
 
         <h3 class="section-subheading">Horas disponíveis e colaboradores ativos, mês a mês</h3>
         <p class="muted">
           Barra = horas <strong>disponíveis</strong> no mês (eixo à esquerda). Linha roxa = colaboradores com pelo
-          menos 1 apontamento naquele mês (eixo à direita — rótulos na cor da linha).
+          menos 1 registro naquele mês (eixo à direita — rótulos na cor da linha).
         </p>
         <div class="chart-wrap">
           <svg id="equipeChartColabDual" width="720" height="300" viewBox="0 0 720 300" role="img" aria-label="Horas disponíveis e colaboradores ativos por mês"></svg>
         </div>
         <div class="legend-row">
           <span><i style="background: var(--color-primary)"></i>Horas disponíveis (esquerda)</span>
-          <span><i class="line" style="border-color: var(--count-line); opacity: 1;"></i>Colaboradores com apontamento no mês (direita)</span>
+          <span><i class="line" style="border-color: var(--count-line); opacity: 1;"></i>Colaboradores com registro no mês (direita)</span>
         </div>
 
         <h3 class="section-subheading">Horas disponíveis e projetos executados, mês a mês</h3>
-        <p class="muted">Mesma composição: barra = horas disponíveis (esquerda); linha = projetos com apontamento no mês (direita).</p>
+        <p class="muted">Mesma composição: barra = horas disponíveis (esquerda); linha = projetos com registro no mês (direita).</p>
         <div class="chart-wrap">
           <svg id="equipeChartProjDual" width="720" height="300" viewBox="0 0 720 300" role="img" aria-label="Horas disponíveis e projetos executados por mês"></svg>
         </div>
         <div class="legend-row">
           <span><i style="background: var(--color-primary)"></i>Horas disponíveis (esquerda)</span>
-          <span><i class="line" style="border-color: var(--count-line); opacity: 1;"></i>Projetos com apontamento no mês (direita)</span>
+          <span><i class="line" style="border-color: var(--count-line); opacity: 1;"></i>Projetos com registro no mês (direita)</span>
         </div>
 
         <h3 class="section-subheading">Horas consumidas por projeto, por atividade</h3>
-        <p class="muted">Apontamentos do ano selecionado, agrupados por projeto e por atividade.</p>
-        <p id="equipeProjectBarsEmptyState" class="empty-state hidden">Nenhum apontamento concluído no ano selecionado.</p>
+        <p class="muted">Registros do período selecionado, agrupados por projeto e por atividade.</p>
+        <p id="equipeProjectBarsEmptyState" class="empty-state hidden">Nenhum registro concluído no período selecionado.</p>
         <div id="equipeProjectBarsContainer" class="horas-chart-container"></div>
 
         <h3 class="section-subheading">Composição das horas por cargo</h3>
-        <p class="muted">Soma das horas do ano selecionado de cada colaborador, agrupada pelo campo "Cargo" do cadastro.</p>
-        <p id="equipeCargoDonutEmptyState" class="empty-state hidden">Nenhum apontamento concluído no ano selecionado.</p>
+        <p class="muted">Soma das horas do período selecionado de cada colaborador, agrupada pelo campo "Cargo" do cadastro.</p>
+        <p id="equipeCargoDonutEmptyState" class="empty-state hidden">Nenhum registro concluído no período selecionado.</p>
         <div id="equipeCargoDonutContainer" class="departamento-chart-container"></div>
 
         <h3 class="section-subheading">Mapa de calor — Projetos × Meses</h3>
-        <p class="muted">Quais projetos consumiram mais horas em quais meses do ano selecionado — quanto mais escura a célula, mais horas.</p>
-        <p id="equipeHeatmapEmptyState" class="empty-state hidden">Nenhum apontamento concluído no ano selecionado.</p>
+        <p class="muted">Quais projetos consumiram mais horas em quais meses — quanto mais escura a célula, mais horas.</p>
+        <p id="equipeHeatmapEmptyState" class="empty-state hidden">Nenhum registro concluído no período selecionado.</p>
         <div class="heatmap-wrap">
           <table class="heatmap heatmap--months" id="equipeHeatmapTable"></table>
         </div>
@@ -701,28 +795,50 @@
           <span class="ramp"></span>
           <span>Mais horas</span>
         </div>
+
+        <h3 class="section-subheading">Horas totais por atividade, por mês</h3>
+        <p class="muted">Mesma análise do relatório individual, somando todos os colaboradores ativos, mês a mês. Clique numa atividade na legenda pra mostrar ou esconder.</p>
+        <p id="equipeAtividadeMensalEmptyState" class="empty-state hidden">Nenhum registro concluído no período selecionado.</p>
+        <div class="chart-wrap">
+          <svg id="equipeChartAtividadeMensal" width="720" height="300" viewBox="0 0 720 300" role="img" aria-label="Horas totais por atividade, por mês — equipe"></svg>
+        </div>
+        <div class="legend-row" id="equipeLegendAtividadeMensal"></div>
       </section>
 
       <!-- ---------------- Financeira ---------------- -->
+      <section id="tab-analise-projeto" class="tab-panel card hidden">
+        <div class="panel-header">
+          <h2>Análise de Projeto</h2>
+          <div class="panel-header__controls">
+            <select id="apCliente" aria-label="Cliente"></select>
+            <select id="apProjeto" aria-label="Projeto"></select>
+            <button type="button" class="btn btn--ghost btn--small no-print" id="apExportPdfButton">Exportar PDF</button>
+            <button type="button" class="btn btn--ghost btn--small no-print" id="apShareHtmlButton">Compartilhar em HTML</button>
+          </div>
+        </div>
+        <p id="apTitulo" class="ap-titulo"></p>
+        <p class="ap-escopo">Esta aba analisa <strong>todo o histórico do projeto selecionado</strong> (do 1º ao último registro de horas), por isso o filtro global de período não se aplica aqui. Entram <strong>todos</strong> os colaboradores que registraram horas no projeto, inclusive os <em>isentos de registro</em> e os inativos.</p>
+        <p id="apVazio" class="empty-state hidden"></p>
+        <div id="apConteudo"></div>
+      </section>
+
       <section id="tab-financeira" class="tab-panel card hidden">
         <div class="panel-header">
           <h2>Financeira</h2>
-          <div class="panel-header__controls">
-            <label for="financeiraAnoSelect" class="visually-hidden">Ano</label>
-            <select id="financeiraAnoSelect"></select>
-          </div>
         </div>
+
+        <p class="periodo-badge" data-periodo-badge></p>
 
         <div class="kpi-grid">
           <div class="kpi">
-            <span class="kpi__label">Custo do departamento por ano</span>
+            <span class="kpi__label" id="kpiCustoAnoLabel">Custo do departamento no período</span>
             <span class="kpi__value" id="kpiCustoAnoValue">—</span>
-            <span class="kpi__sub">soma do custo mensal dos colaboradores ativos × 12</span>
+            <span class="kpi__sub" id="kpiCustoAnoSub">soma do custo mensal dos colaboradores ativos × 12</span>
           </div>
           <div class="kpi">
             <span class="kpi__label">Valor orçado</span>
             <span class="kpi__value accent" id="kpiOrcadoAnoValue">—</span>
-            <span class="kpi__sub">projetos orçados com apontamento, exceto internos</span>
+            <span class="kpi__sub">projetos orçados com registro, exceto internos</span>
           </div>
           <div class="kpi">
             <span class="kpi__label">Margem acumulada</span>
@@ -740,7 +856,7 @@
         <p class="muted">
           Linha escura = custo do departamento (soma fixa dos salários dos colaboradores ativos — não varia com
           dias úteis). Barras = valor orçado dos projetos que concluíram naquele mês (receita reconhecida de uma
-          vez, na conclusão). Linha tracejada azul = receita média do ano — se ficar acima da linha de custo, essa
+          vez, na conclusão). Linha tracejada azul = receita média do período — se ficar acima da linha de custo, essa
           distância é o espaço médio mensal pra cobrir custo fixo e ainda sobrar pra investimento.
         </p>
         <p id="financeiraCustoMensalEmptyState" class="empty-state hidden">Nenhum colaborador ativo cadastrado.</p>
@@ -750,23 +866,23 @@
         <div class="legend-row">
           <span><i style="background: var(--activity-3)"></i>Receita reconhecida (projeto concluído no mês)</span>
           <span><i class="line" style="border-top: 2px solid var(--color-text); border-color: var(--color-text);"></i>Custo do departamento</span>
-          <span><i class="line" style="border-top: 1.5px dashed var(--activity-1); border-color: var(--activity-1);"></i>Receita média do ano</span>
+          <span><i class="line" style="border-top: 1.5px dashed var(--activity-1); border-color: var(--activity-1);"></i>Receita média do período</span>
         </div>
 
         <h3 class="section-subheading">Margem por projeto</h3>
-        <p class="muted">Valor orçado menos custo de mão de obra acumulado até agora. Projetos internos (sem orçamento) ficam de fora — aparecem só nos gráficos de custo abaixo.</p>
-        <p id="financeiraMargemEmptyState" class="empty-state hidden">Nenhum projeto orçado com apontamento ainda.</p>
+        <p class="muted">Valor orçado menos custo de mão de obra acumulado até o fim do período selecionado (ou até hoje, se o período ainda não terminou). Projetos internos (sem orçamento) ficam de fora — aparecem só nos gráficos de custo abaixo.</p>
+        <p id="financeiraMargemEmptyState" class="empty-state hidden">Nenhum projeto orçado com registro ainda.</p>
         <div class="margem-rows" id="financeiraMargemRows"></div>
 
         <h3 class="section-subheading">% do orçamento consumido</h3>
         <p class="muted">Progresso do custo acumulado frente ao valor orçado — sinaliza quem está perto ou já passou do limite antes mesmo de terminar.</p>
-        <p id="financeiraOrcamentoEmptyState" class="empty-state hidden">Nenhum projeto orçado com apontamento ainda.</p>
+        <p id="financeiraOrcamentoEmptyState" class="empty-state hidden">Nenhum projeto orçado com registro ainda.</p>
         <div class="orcamento-rows" id="financeiraOrcamentoRows"></div>
 
         <h3 class="section-subheading">Projeção de custo por projeto</h3>
         <p class="muted">
           Cada linha é um projeto, indexado a % do prazo previsto decorrido (eixo X) e % do orçamento consumido
-          (eixo Y). A diagonal pontilhada é o "ritmo ideal". Trecho sólido = custo real até hoje; trecho tracejado =
+          (eixo Y). A diagonal pontilhada é o "ritmo ideal". Trecho sólido = custo real até a data de referência (hoje, ou o fim do período selecionado); trecho tracejado =
           projeção até o término previsto, pela taxa de consumo dos últimos 3 meses. Clique num projeto na legenda
           pra ocultar/mostrar.
         </p>
@@ -813,8 +929,8 @@
         <p class="chart-footnote">Por que olhar isso: mostra se o custo do departamento está concentrado demais numa faixa de senioridade — ajuda a decidir se contratar mais júnior/estagiário é uma forma de aliviar custo fixo sem perder capacidade.</p>
 
         <h3 class="section-subheading">Custo de mão de obra por projeto, por atividade</h3>
-        <p class="muted">Mesmo padrão do gráfico de horas por projeto/atividade da aba Apontamentos, convertido em R$ (horas × custo/hora de quem apontou).</p>
-        <p id="financeiraCustoProjetoEmptyState" class="empty-state hidden">Nenhum apontamento concluído no ano selecionado.</p>
+        <p class="muted">Mesmo padrão do gráfico de horas por projeto/atividade da aba Registro de Tempo, convertido em R$ (horas × custo/hora de quem registrou).</p>
+        <p id="financeiraCustoProjetoEmptyState" class="empty-state hidden">Nenhum registro concluído no período selecionado.</p>
         <div id="financeiraCustoProjetoContainer" class="horas-chart-container"></div>
         <p class="chart-footnote">Por que olhar isso: mostra não só quanto cada projeto custou, mas em qual etapa do trabalho o dinheiro foi gasto — ajuda a orçar projetos parecidos no futuro e a identificar atividades que consistentemente consomem mais do que o esperado.</p>
       </section>
@@ -939,39 +1055,37 @@
       <section id="tab-relatorio" class="tab-panel card hidden">
         <div class="panel-header">
           <div>
-            <h2>Relatório individual — Apontamentos</h2>
+            <h2>Relatório individual — Registro de Tempo</h2>
             <p class="subtitle" id="relatorioSubtitle"></p>
           </div>
           <div class="panel-header__controls">
             <label for="relatorioColaboradorSelect" class="visually-hidden">Colaborador</label>
             <select id="relatorioColaboradorSelect"></select>
-            <label for="relatorioMesSelect" class="visually-hidden">Mês</label>
-            <select id="relatorioMesSelect"></select>
             <button type="button" class="btn btn--ghost btn--small" id="relatorioVoltarButton">Voltar</button>
             <button type="button" class="btn btn--ghost btn--small" id="relatorioExportPdfButton">Exportar PDF</button>
             <button type="button" class="btn btn--ghost btn--small" id="relatorioShareHtmlButton">Compartilhar em HTML</button>
           </div>
         </div>
 
-        <p id="relatorioEmptyState" class="empty-state hidden">Nenhum apontamento neste mês para este colaborador.</p>
+        <p id="relatorioEmptyState" class="empty-state hidden">Nenhum registro neste período para este colaborador.</p>
 
         <div id="relatorioConteudo">
           <div class="resumo-box" id="relatorioResumoBox"></div>
 
-          <h3 class="section-subheading">Carga horária do mês</h3>
+          <h3 class="section-subheading">Carga horária do período</h3>
           <div class="kpi-grid">
             <div class="kpi">
-              <span class="kpi__label">Carga prevista no mês</span>
+              <span class="kpi__label">Carga prevista no período</span>
               <span class="kpi__value" id="relatorioKpiCargaValue">—</span>
               <span class="kpi__sub" id="relatorioKpiCargaSub"></span>
             </div>
             <div class="kpi">
-              <span class="kpi__label">Horas apontadas</span>
+              <span class="kpi__label">Horas registradas</span>
               <span class="kpi__value" id="relatorioKpiHorasValue">—</span>
               <span class="kpi__sub" id="relatorioKpiHorasSub"></span>
             </div>
             <div class="kpi">
-              <span class="kpi__label">Dias sem apontamento</span>
+              <span class="kpi__label">Dias sem registro</span>
               <span class="kpi__value" id="relatorioKpiFaltasValue">—</span>
               <span class="kpi__sub" id="relatorioKpiFaltasSub"></span>
             </div>
@@ -982,13 +1096,13 @@
             </div>
           </div>
 
-          <h3 class="section-subheading">Comportamento de apontamento</h3>
-          <p class="muted">Compara o dia em que a atividade foi trabalhada com o dia em que foi realmente registrada — mostra se o colaborador aponta em dia ou em lote (fim de semana/fim do mês).</p>
-          <p id="relatorioComportamentoEmptyState" class="empty-state hidden">Sem apontamentos com data de registro suficientes pra essa análise neste mês.</p>
+          <h3 class="section-subheading">Comportamento de registro</h3>
+          <p class="muted">Compara o dia em que a atividade foi trabalhada com o dia em que foi realmente registrada — mostra se o colaborador registra em dia ou em lote (fim de semana/fim do mês).</p>
+          <p id="relatorioComportamentoEmptyState" class="empty-state hidden">Sem registros com data suficientes pra essa análise neste período.</p>
           <div id="relatorioComportamentoConteudo">
             <div class="kpi-grid">
               <div class="kpi">
-                <span class="kpi__label">Atraso médio no apontamento</span>
+                <span class="kpi__label">Atraso médio no registro</span>
                 <span class="kpi__value" id="relatorioKpiAtrasoValue">—</span>
                 <span class="kpi__sub" id="relatorioKpiAtrasoSub"></span>
               </div>
@@ -996,19 +1110,19 @@
             <p class="muted" id="relatorioComportamentoResumo" style="margin-top: var(--space-3);"></p>
             <p class="muted"><strong>Em qual dia da semana costuma registrar</strong> — soma das horas registradas em cada dia da semana (não o dia trabalhado, o dia do registro em si).</p>
             <div class="chart-wrap">
-              <svg id="chartRelatorioComportamento" height="180" viewBox="0 0 480 180" role="img" aria-label="Em qual dia da semana o colaborador costuma registrar apontamentos"></svg>
+              <svg id="chartRelatorioComportamento" height="180" viewBox="0 0 480 180" role="img" aria-label="Em qual dia da semana o colaborador costuma registrar o tempo das atividades"></svg>
             </div>
           </div>
 
-          <h3 class="section-subheading">Horas apontadas por dia</h3>
-          <p class="muted">Cada barra é um dia do mês. Linha tracejada = meta diária. Vermelho = dia útil sem apontamento.</p>
+          <h3 class="section-subheading">Tempo registrado por dia</h3>
+          <p class="muted">Cada barra é um dia (período de um mês) ou um mês (períodos longos, com a média de horas por dia útil). Linha tracejada = meta diária. Vermelho = dia útil sem registro.</p>
           <div class="chart-wrap">
-            <svg id="chartRelatorioStatus" height="260" viewBox="0 0 820 260" role="img" aria-label="Horas apontadas por dia"></svg>
+            <svg id="chartRelatorioStatus" height="260" viewBox="0 0 820 260" role="img" aria-label="Tempo registrado por dia"></svg>
           </div>
           <div class="legend-row">
             <span><i style="background: var(--status-good)"></i>Dentro da meta</span>
             <span><i style="background: var(--status-warning)"></i>Abaixo de 70% da meta</span>
-            <span><i style="background: var(--status-critical)"></i>Sem apontamento</span>
+            <span><i style="background: var(--status-critical)"></i>Sem registro</span>
             <span><i class="line" style="border-top: 2px dashed var(--color-text); border-color: var(--color-text);"></i>Meta diária</span>
           </div>
 
@@ -1019,8 +1133,16 @@
           </div>
           <div class="legend-row" id="legendRelatorioAtividade"></div>
 
+          <h3 class="section-subheading">Horas totais por atividade, por mês</h3>
+          <p class="muted">Evolução mensal das horas dedicadas a cada atividade ao longo do período — cada linha é uma atividade. Clique numa atividade na legenda pra mostrar ou esconder.</p>
+          <p id="relatorioAtividadeMensalEmptyState" class="empty-state hidden">Sem registros suficientes neste período pra montar esse gráfico.</p>
+          <div class="chart-wrap">
+            <svg id="chartRelatorioAtividadeMensal" width="720" height="300" viewBox="0 0 720 300" role="img" aria-label="Horas totais por atividade, por mês"></svg>
+          </div>
+          <div class="legend-row" id="legendRelatorioAtividadeMensal"></div>
+
           <h3 class="section-subheading">Distribuição por atividade</h3>
-          <p class="muted">Como as horas do mês se dividem entre as atividades, com a média diária de cada uma ao longo dos dias úteis.</p>
+          <p class="muted">Como as horas do período se dividem entre as atividades, com a média diária de cada uma ao longo dos dias úteis.</p>
           <div class="atividade-split">
             <div class="atividade-split__svg">
               <svg id="chartRelatorioPizza" width="200" height="200" viewBox="0 0 200 200" role="img" aria-label="Distribuição de horas por atividade"></svg>
@@ -1030,11 +1152,11 @@
               <tbody id="relatorioAtividadeTableBody"></tbody>
             </table>
           </div>
-          <p class="chart-footnote">Média calculada sobre todos os dias úteis do mês (não só os dias em que a atividade apareceu).</p>
+          <p class="chart-footnote">Média calculada sobre todos os dias úteis do período (não só os dias em que a atividade apareceu).</p>
 
           <h3 class="section-subheading">Projetos × Atividades</h3>
-          <p class="muted">Em quais projetos o tempo foi mais concentrado no mês, e em qual atividade dentro de cada um. Projetos ordenados do que mais consumiu tempo para o que menos.</p>
-          <p id="relatorioHeatmapEmptyState" class="empty-state hidden">Nenhum apontamento neste mês para montar o mapa de calor.</p>
+          <p class="muted">Em quais projetos o tempo foi mais concentrado no período, e em qual atividade dentro de cada um. Projetos ordenados do que mais consumiu tempo para o que menos.</p>
+          <p id="relatorioHeatmapEmptyState" class="empty-state hidden">Nenhum registro neste período para montar o mapa de calor.</p>
           <div class="heatmap-wrap">
             <table class="heatmap" id="relatorioHeatmapTable"></table>
           </div>
@@ -1054,7 +1176,7 @@
 
   <footer class="admin-footer">
     <p class="admin-footer__title">Gestão de Pessoas — Agricef, Experimentação Agrícola</p>
-    <p class="admin-footer__meta">Desenvolvido por Rafael de Souza Favalli · Julho de 2026 · última atualização em Agosto de 2026</p>
+    <p class="admin-footer__meta">Desenvolvido por Rafael de Souza Favalli · Julho de 2026 · <span id="footerUltimaRevisao">última atualização em Outubro de 2026</span></p>
     <p class="admin-footer__notice">Dashboard em fase de implementação — os resultados apresentados estão sujeitos a revisão.</p>
     <p class="admin-footer__tech">Dados armazenados em uma planilha do Google Sheets, acessada via Google Apps Script. Veja <code>backend/SETUP.md</code> para detalhes.</p>
   </footer>
@@ -1063,6 +1185,7 @@
   <script src="js/data.js"></script>
   <script src="js/holidays.js"></script>
   <script src="js/api.js"></script>
+  <script src="js/trator.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
