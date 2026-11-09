@@ -594,6 +594,7 @@
             <label class="tr-choice"><input type="radio" name="disp" value="Manual"><span>Manual</span></label>
             <label class="tr-choice"><input type="radio" name="disp" value="Não disponível"><span>Não disponível</span></label>
           </div>
+          <p class="tr-ajuda-disp"><strong>Manual</strong> = trabalha no modo manual. <strong>Não disponível</strong> = não pode ser usado.</p>
         </fieldset>
       </div>`;
   }

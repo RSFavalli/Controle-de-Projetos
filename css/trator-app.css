@@ -257,3 +257,5 @@
   .tr-edit-ev__linha { grid-template-columns: 1fr 1fr; }
   .tr-clock { font-size: 3.2rem; }
 }
+
+.tr-ajuda-disp { margin: var(--space-2) 0 0; font-size: 0.82rem; color: var(--color-text-muted); }

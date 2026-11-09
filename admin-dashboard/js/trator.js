@@ -21,6 +21,31 @@ const TratorAdmin = (() => {
   let busca = '';
   let edicao = null; // { lista, item|null }
 
+  // Dashboard (Fase 4)
+  let abaAtiva = 'resumo';
+  let dados = null; // { turnos, eventos } crus do backend
+  let base = null; // TratorCalc.preparar(dados)
+  let filtros = null;
+  let ui = {};
+  let atualizadoEm = null;
+
+  const ICONES = {
+    resumo: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',
+    tempo: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2" stroke-linecap="round" stroke-linejoin="round"/>',
+    status: '<path d="M4 18V9M10 18V5M16 18v-7M21 18H3" stroke-linecap="round"/>',
+    ofensores: '<path d="M5 20V10M11 20V4M17 20v-6" stroke-linecap="round"/>',
+    tendencia: '<path d="M3 17l5-6 4 3 8-9" stroke-linecap="round" stroke-linejoin="round"/>',
+    hora: '<path d="M4 6h16M4 12h16M4 18h16M9 4v16M15 4v16" stroke-linecap="round"/>',
+    implementos: '<path d="M4 7h16M4 12h10M4 17h13" stroke-linecap="round"/>',
+    registros: '<path d="M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h7" stroke-linecap="round" stroke-linejoin="round"/>',
+    listas: '<path d="M8.5 6.5H20M8.5 12H20M8.5 17.5H20M4 6.5h.01M4 12h.01M4 17.5h.01" stroke-linecap="round" stroke-linejoin="round"/>',
+    migracao: '<path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 20h14" stroke-linecap="round" stroke-linejoin="round"/>',
+  };
+  const ABAS_NAV = [
+    ['resumo', 'Resumo'], ['tempo', 'Tempo monitorado'], ['status', 'Status do trator'], ['ofensores', 'Ofensores'],
+    ['tendencia', 'Tendência'], ['hora', 'Hora do dia'], ['implementos', 'Implementos'], ['registros', 'Registros'], ['migracao', 'Migração'], ['listas', 'Listas'],
+  ];
+
   const RESP_CLASSE = {
     'ASI/Agricef': 'tr-pill--asi',
     Cliente: 'tr-pill--cli',
@@ -229,6 +254,10 @@ const TratorAdmin = (() => {
   function enter(contexto) {
     ctx = contexto;
     data = null;
+    dados = null;
+    base = null;
+    filtros = null;
+    ui = {};
     edicao = null;
     busca = '';
     const root = document.getElementById('tratorRoot');
@@ -237,24 +266,73 @@ const TratorAdmin = (() => {
     document.querySelectorAll('.tab-panel').forEach((p) => p.classList.toggle('hidden', p.id !== 'tratorRoot'));
     root.classList.remove('hidden');
     root.innerHTML = `
-      <div class="panel-header"><h2>Listas</h2></div>
-      <p class="muted tr-intro">Cadastros que alimentam o app de campo e o dashboard. Nada é apagado: itens que saem de uso são desativados.</p>
-      <div class="tr-seg" id="trSeg" role="tablist" aria-label="Listas"></div>
-      <div id="trCorpo"></div>`;
+      <div class="panel-header tr-topo"><h2 id="trTitulo"></h2>
+        <div class="tr-topo__acoes"><span class="muted" id="trAtualizado"></span>
+          <span class="tr-topo__export hidden" id="trExportBtns"><button type="button" class="btn btn--ghost btn--small no-print" id="trExportPdf">Exportar PDF</button><button type="button" class="btn btn--ghost btn--small no-print" id="trExportHtml">Compartilhar em HTML</button></span>
+          <button type="button" class="btn btn--ghost btn--small" id="trAtualizar">Atualizar dados</button></div></div>
+      <div id="trFiltros" class="hidden"></div>
+      <div id="trAnalise"></div>
+      <div id="trListasWrap" class="hidden">
+        <p class="muted tr-intro">Cadastros que alimentam o app de campo e o dashboard. Nada é apagado: itens que saem de uso são desativados.</p>
+        <div class="tr-seg" id="trSeg" role="tablist" aria-label="Listas"></div>
+        <div id="trCorpo"></div>
+      </div>`;
+    document.getElementById('trAtualizar').addEventListener('click', () => load());
+    window.TratorExport.init({
+      toast: (msg, tipo) => ctx.toast(msg, tipo),
+      getContexto: () => ({ base, listas: listasDash(), filtros, abaAtiva, dados }),
+    });
+    document.getElementById('trExportPdf').addEventListener('click', () => window.TratorExport.abrir('pdf'));
+    document.getElementById('trExportHtml').addEventListener('click', () => window.TratorExport.abrir('html'));
+    desenharNav();
     load();
+  }
+
+  function desenharNav() {
+    const nav = document.getElementById('tratorNav');
+    nav.innerHTML = ABAS_NAV.map(([k, rot]) =>
+      `<button type="button" class="trnav-button${k === abaAtiva ? ' is-active' : ''}" data-trator-tab="${k}" role="tab" aria-selected="${k === abaAtiva}">
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">${ICONES[k]}</svg>${esc(rot)}</button>`
+    ).join('');
+    nav.querySelectorAll('.trnav-button').forEach((b) => b.addEventListener('click', () => irPara(b.dataset.tratorTab)));
+  }
+
+  function irPara(aba, patchFiltros) {
+    abaAtiva = aba;
+    if (patchFiltros && filtros) Object.assign(filtros, patchFiltros, { atalho: filtros.atalho });
+    ui.regPagina = 1;
+    ui.regAberto = null;
+    desenharNav();
+    render();
   }
 
   async function load() {
     ctx.beginLoading();
     try {
-      data = await Api.call('loadTratorInit', ctx.getSession());
+      const sessao = ctx.getSession();
+      const [init, dd] = await Promise.all([
+        Api.call('loadTratorInit', sessao),
+        // Backend ainda sem a Fase 4 (Code.gs antigo): as Listas continuam funcionando.
+        Api.call('loadTratorDados', sessao).catch((e) => {
+          if (/Ação desconhecida/.test(e.message)) return null;
+          throw e;
+        }),
+      ]);
+      data = init;
+      dados = dd;
+      base = window.TratorCalc.preparar(dados || { turnos: [], eventos: [] });
+      if (!filtros) filtros = window.TratorDash.filtrosPadrao(listasDash());
+      atualizadoEm = new Date();
       render();
     } catch (err) {
       if (isAuthError(err)) {
         ctx.onAuthError();
       } else {
         ctx.toast(`Erro ao carregar dados: ${err.message}`, 'error');
-        document.getElementById('trCorpo').innerHTML =
+        document.getElementById('trFiltros').classList.add('hidden');
+        document.getElementById('trListasWrap').classList.add('hidden');
+        const a = document.getElementById('trAnalise');
+        a.innerHTML =
           `<p class="empty-state">Não deu para carregar: ${esc(err.message)}</p>` +
           '<p><button type="button" class="btn btn--start btn--small" id="trRetry">Tentar novamente</button></p>';
         document.getElementById('trRetry').addEventListener('click', load);
@@ -264,9 +342,87 @@ const TratorAdmin = (() => {
     }
   }
 
+  function listasDash() {
+    return { usinas: data.usinas, tratores: data.tratores, implementos: data.implementos, causas: data.causas };
+  }
+
+  const TITULOS = {
+    resumo: 'Resumo', tempo: 'Tempo monitorado', status: 'Status do trator', ofensores: 'Ofensores', tendencia: 'Tendência',
+    hora: 'Hora do dia', implementos: 'Implementos', registros: 'Registros', migracao: 'Migração do histórico', listas: 'Listas',
+  };
+
   /* ------------------------------- Renderização ------------------------------- */
 
   function render() {
+    if (!data) return;
+    document.getElementById('trTitulo').textContent = TITULOS[abaAtiva] || '';
+    document.getElementById('trAtualizado').textContent = atualizadoEm
+      ? `Atualizado às ${String(atualizadoEm.getHours()).padStart(2, '0')}:${String(atualizadoEm.getMinutes()).padStart(2, '0')}`
+      : '';
+    const ehListas = abaAtiva === 'listas';
+    const ehMigracao = abaAtiva === 'migracao';
+    // Exportar só nas análises, quando já há dados carregados.
+    document.getElementById('trExportBtns').classList.toggle('hidden', ehListas || ehMigracao || !dados);
+    document.getElementById('trListasWrap').classList.toggle('hidden', !ehListas);
+    document.getElementById('trAnalise').classList.toggle('hidden', ehListas);
+    document.getElementById('trFiltros').classList.toggle('hidden', ehListas || ehMigracao);
+    if (ehListas) {
+      renderListas();
+      return;
+    }
+    if (ehMigracao) {
+      document.getElementById('trFiltros').classList.add('hidden');
+      renderMigracao();
+      return;
+    }
+    if (!dados) {
+      document.getElementById('trFiltros').classList.add('hidden');
+      document.getElementById('trAnalise').innerHTML =
+        '<p class="empty-state">O backend desta equipe ainda não tem a Fase 4. Cole o <code>Code.gs</code> novo no Apps Script e publique uma nova versão da implantação (veja SETUP-TRATOR.md). As Listas continuam funcionando.</p>';
+      return;
+    }
+    renderAnalise();
+  }
+
+  function renderMigracao() {
+    window.TratorMigracao.render(document.getElementById('trAnalise'), {
+      api: (acao, extra) => Api.call(acao, Object.assign({}, ctx.getSession(), extra)),
+      isAuthError,
+      onAuthError: () => ctx.onAuthError(),
+      beginLoading: () => ctx.beginLoading(),
+      endLoading: () => ctx.endLoading(),
+      irPara: (aba) => irPara(aba),
+      onGravado: async () => {
+        // recarrega listas e dados para os gráficos já usarem o histórico
+        try {
+          const sessao = ctx.getSession();
+          const novos = await Api.call('loadTratorDados', sessao);
+          dados = novos;
+          base = window.TratorCalc.preparar(dados);
+          atualizadoEm = new Date();
+          document.getElementById('trAtualizado').textContent = 'Dados atualizados';
+        } catch (err) {
+          ctx.toast(`Histórico gravado, mas não deu para recarregar os gráficos: ${err.message}`, 'error');
+        }
+      },
+    });
+  }
+
+  function renderAnalise() {
+    const L = listasDash();
+    const D = window.TratorDash;
+    const res = window.TratorCalc.resumo(base, D.paraCalc(filtros, L));
+    const estado = { res, listas: L, filtros, ui, base };
+    const cb = {
+      setFiltro: (patch) => { Object.assign(filtros, patch); renderAnalise(); },
+      irPara,
+      rerender: () => renderAnalise(),
+    };
+    D.barraFiltros(document.getElementById('trFiltros'), estado, cb);
+    D.aba(abaAtiva, document.getElementById('trAnalise'), estado, cb);
+  }
+
+  function renderListas() {
     const seg = document.getElementById('trSeg');
     seg.innerHTML = ORDEM.map((k) =>
       `<button type="button" class="tr-seg__btn${k === listaAtiva ? ' is-active' : ''}" data-lista="${k}" role="tab">${esc(DEFS[k].rotulo)}</button>`
@@ -276,7 +432,7 @@ const TratorAdmin = (() => {
         listaAtiva = b.dataset.lista;
         busca = '';
         edicao = null;
-        render();
+        renderListas();
       })
     );
     renderLista();
