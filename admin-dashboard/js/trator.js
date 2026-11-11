@@ -107,6 +107,7 @@ const TratorAdmin = (() => {
         { t: 'Nome', v: (x) => `<strong>${esc(x.nome)}</strong>` },
         { t: 'Nome em inglês', v: (x) => esc(x.nome_en || '—') },
         { t: 'Responsável', v: (x) => pillResp(x.responsavel) },
+        { t: 'Aparece em', v: (x) => [x.uso_manual ? 'Operação manual' : '', x.uso_parada ? 'Parada' : ''].filter(Boolean).map((r) => `<span class="tr-pill tr-pill--ng">${r}</span>`).join(' ') || '—' },
         { t: 'Ordem', v: (x) => esc(x.ordem === '' ? '—' : x.ordem) },
       ],
       textoBusca: (x) => `${x.nome} ${x.nome_en} ${x.responsavel}`,
@@ -115,9 +116,11 @@ const TratorAdmin = (() => {
         { k: 'nome_en', label: 'Nome em inglês', tipo: 'text', ajuda: 'Se não houver o termo correto em inglês, descreva a atividade.' },
         { k: 'responsavel', label: 'Responsável', tipo: 'select', req: true, opcoes: () => data.responsaveis.map((r) => ({ v: r, t: r })) },
         { k: 'ordem', label: 'Ordem na lista', tipo: 'number', min: 0, step: 1 },
+        { k: 'uso_manual', label: 'Aparece em “Operação manual”', tipo: 'checkbox', padrao: false, ajuda: 'Lista de causas do botão Operação manual no app. “Outras” sempre aparece no fim.' },
+        { k: 'uso_parada', label: 'Aparece em “Parada”', tipo: 'checkbox', padrao: true, ajuda: 'Lista de causas do botão Parada no app.' },
         { k: 'ativo', label: 'Ativa', tipo: 'checkbox', padrao: true },
       ],
-      padrao: () => ({ ativo: true, ordem: (data.causas.reduce((m, c) => Math.max(m, Number(c.ordem) || 0), 0) + 1) }),
+      padrao: () => ({ ativo: true, uso_parada: true, uso_manual: false, ordem: (data.causas.reduce((m, c) => Math.max(m, Number(c.ordem) || 0), 0) + 1) }),
     },
     dicionario: {
       rotulo: 'Dicionário',
@@ -165,20 +168,21 @@ const TratorAdmin = (() => {
       rotulo: 'Tratores',
       fem: false,
       singular: 'trator',
-      desc: 'Tratores de cada usina. O “Trator (histórico)” existe só para ancorar os dados migrados das planilhas e fica inativo.',
+      desc: 'Tratores de cada usina. Cada usina tem um “Trator TESTE (simulação)” criado automaticamente para treinos e simulações. O “Trator (histórico)” existe só para ancorar os dados migrados das planilhas e fica inativo.',
       novo: '+ Novo trator',
       itens: () => data.tratores.slice().sort((a, b) => nomeDe('usinas', a.usina_id).localeCompare(nomeDe('usinas', b.usina_id), 'pt-BR') || a.nome.localeCompare(b.nome, 'pt-BR')),
       colunas: [
         { t: 'Usina', v: (x) => esc(nomeDe('usinas', x.usina_id)) },
-        { t: 'Nome', v: (x) => `<strong>${esc(x.nome)}</strong>` },
+        { t: 'Nome', v: (x) => `<strong>${esc(x.nome)}</strong>${x.teste ? ' <span class="tr-pill tr-pill--ng">teste</span>' : ''}` },
       ],
       textoBusca: (x) => `${nomeDe('usinas', x.usina_id)} ${x.nome}`,
       campos: [
         { k: 'usina_id', label: 'Usina', tipo: 'select', req: true, opcoes: usinasOpts },
         { k: 'nome', label: 'Nome ou identificação', tipo: 'text', req: true },
+        { k: 'teste', label: 'Trator de teste', tipo: 'checkbox', padrao: false, ajuda: 'Usado em simulações: aparece no app, mas só entra no dashboard em “Trator de teste”, nunca nos dados reais.' },
         { k: 'ativo', label: 'Ativo', tipo: 'checkbox', padrao: true },
       ],
-      padrao: () => ({ ativo: true }),
+      padrao: () => ({ ativo: true, teste: false }),
     },
     usinas: {
       rotulo: 'Usinas',
@@ -505,7 +509,7 @@ const TratorAdmin = (() => {
       const id = `trf_${c.k}`;
       const valor = base[c.k] === undefined ? (c.padrao === undefined ? '' : c.padrao) : base[c.k];
       if (c.tipo === 'checkbox') {
-        return `<div class="field field--checkbox"><label><input type="checkbox" id="${id}" ${valor ? 'checked' : ''} /> ${esc(c.label)}</label></div>`;
+        return `<div class="field field--checkbox"><label><input type="checkbox" id="${id}" ${valor ? 'checked' : ''} /> ${esc(c.label)}</label>${c.ajuda ? `<p class="field-hint">${esc(c.ajuda)}</p>` : ''}</div>`;
       }
       if (c.tipo === 'select') {
         const opcoes = c.opcoes();

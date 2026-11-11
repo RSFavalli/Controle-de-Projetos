@@ -20,14 +20,16 @@
 
   const ALERTA_MS = 60 * 60 * 1000; // aviso de 1 em 1 hora
   const DIAS_HISTORICO = 30;
-  const DISP_PARADA = ['Manual', 'Não disponível'];
+  // Botões do técnico: Operação autônoma / Operação manual (trator "Manual") / Parada (trator "Não disponível").
+  const DISP_DO_MODO = { autonomo: 'Autônomo', manual: 'Manual', parada: 'Não disponível' };
+  const OUTRAS = '__outras';
   const MOTIVOS_PADRAO = ['Feriado', 'Folga', 'Chuva', 'Sem acompanhamento'];
   const TEAM_PREFIX = 'trator-autonomo::';
   const ERROS_DE_LOGIN = /E-mail ou senha inválidos|Este usuário está inativo|não tem permissão/;
 
   let ctx = null; // { session, getSenha, toast, onAuthError, requestPassword, setSyncStatus }
   let state = null;
-  let listas = { usinas: [], tratores: [], implementos: [], metas: [], motivos: MOTIVOS_PADRAO, nomes: {} };
+  let listas = { usinas: [], tratores: [], implementos: [], causas: [], metas: [], motivos: MOTIVOS_PADRAO, nomes: {} };
   let view = { name: 'home' };
   let tickId = null;
   let syncing = false;
@@ -150,7 +152,7 @@
     state.confirmacoes = state.confirmacoes || {};
     state.abertosOutros = state.abertosOutros || [];
     const l = lerJson(CHAVE_LISTAS, null);
-    if (l) listas = Object.assign({ usinas: [], tratores: [], implementos: [], metas: [], motivos: MOTIVOS_PADRAO, nomes: {} }, l);
+    if (l) listas = Object.assign({ usinas: [], tratores: [], implementos: [], causas: [], metas: [], motivos: MOTIVOS_PADRAO, nomes: {} }, l);
   }
   function salvarListas() {
     gravarJson(CHAVE_LISTAS, listas);
@@ -165,10 +167,11 @@
     listas.usinas = dados.usinas || [];
     listas.tratores = dados.tratores || [];
     listas.implementos = dados.implementos || [];
+    listas.causas = dados.causas || [];
     listas.metas = dados.metas || [];
     listas.motivos = dados.motivosSemOperacao && dados.motivosSemOperacao.length ? dados.motivosSemOperacao : MOTIVOS_PADRAO;
     listas.nomes = listas.nomes || {};
-    listas.usinas.concat(listas.tratores, listas.implementos).forEach((x) => { listas.nomes[x.id] = x.nome; });
+    listas.usinas.concat(listas.tratores, listas.implementos, listas.causas).forEach((x) => { listas.nomes[x.id] = x.nome; });
     salvarListas();
   }
 
@@ -184,10 +187,24 @@
     const ultimo = evs[evs.length - 1];
     return (ultimo && ultimo.implemento_id) || t.implemento_id;
   }
-  function rotuloEvento(e) {
-    if (e.tipo === 'autonomo') return 'Operação autônoma';
-    return `Parada · ${e.disponibilidade}`;
+  /** 'autonomo' | 'manual' | 'parada' (eventos antigos: Manual = operação manual; Não disponível = parada). */
+  function modoDe(e) {
+    if (e.tipo === 'autonomo') return 'autonomo';
+    return e.disponibilidade === 'Manual' ? 'manual' : 'parada';
   }
+  const ehTrocaImplemento = (e) => /^Troca de implemento/.test(e.descricao_original || '');
+  function rotuloEvento(e) {
+    const m = modoDe(e);
+    if (m === 'autonomo') return 'Operação autônoma';
+    if (m === 'manual') return ehTrocaImplemento(e) ? 'Troca de implemento' : 'Operação manual';
+    return 'Parada';
+  }
+  /** Causas da lista de cada botão, na ordem do cadastro. */
+  function causasDoModo(modo) {
+    const campo = modo === 'manual' ? 'uso_manual' : 'uso_parada';
+    return (listas.causas || []).filter((c) => c[campo]);
+  }
+  const tratorDeTeste = (id) => !!(listas.tratores || []).find((x) => x.id === id && x.teste);
   function msEvento(e, ate) {
     const ini = Date.parse(e.inicio_iso);
     const fim = e.fim_iso ? Date.parse(e.fim_iso) : (ate || nowMs());
@@ -209,7 +226,7 @@
       observacao: t.observacao || '', criado_em: t.criado_em, atualizado_em: t.atualizado_em,
       eventos: (t.eventos || []).map((e) => ({
         id: e.id, inicio_iso: e.inicio_iso, fim_iso: e.fim_iso || '', tipo: e.tipo, disponibilidade: e.disponibilidade || '',
-        descricao_original: e.descricao_original || '', implemento_id: e.implemento_id || t.implemento_id,
+        descricao_original: e.descricao_original || '', causa_id: e.causa_id || '', implemento_id: e.implemento_id || t.implemento_id,
       })),
     };
   }
@@ -220,21 +237,29 @@
   /* ---------------------------------- Ações --------------------------------- */
 
   function criarEvento(dados, inicioMs, implementoId) {
+    const modo = dados.modo;
+    const causa = dados.causa_id ? (listas.causas || []).find((c) => c.id === dados.causa_id) : null;
     return {
-      id: uuid(), inicio_iso: iso(inicioMs), fim_iso: '', tipo: dados.tipo,
-      disponibilidade: dados.tipo === 'autonomo' ? 'Autônomo' : dados.disp,
-      descricao_original: dados.tipo === 'autonomo' ? '' : dados.desc, implemento_id: implementoId,
+      id: uuid(), inicio_iso: iso(inicioMs), fim_iso: '', tipo: modo === 'autonomo' ? 'autonomo' : 'parada',
+      disponibilidade: DISP_DO_MODO[modo],
+      descricao_original: modo === 'autonomo' ? '' : (causa ? causa.nome : dados.desc),
+      causa_id: modo === 'autonomo' ? '' : (causa ? causa.id : ''),
+      implemento_id: implementoId,
     };
   }
   function lerEventoDoForm(f) {
-    const tipo = f.querySelector('[name=tipo]:checked');
-    if (!tipo) throw new Error('Escolha como o trator está: operação autônoma ou parado.');
-    if (tipo.value === 'autonomo') return { tipo: 'autonomo' };
-    const desc = f.querySelector('[name=desc]').value.trim();
-    const disp = f.querySelector('[name=disp]:checked');
-    if (!desc) throw new Error('Descreva o motivo da parada.');
-    if (!disp) throw new Error('Informe se o trator ficou Manual ou Não disponível.');
-    return { tipo: 'parada', desc: desc, disp: disp.value };
+    const modoEl = f.querySelector('[name=tipo]:checked');
+    if (!modoEl) throw new Error('Escolha como o trator está: operação autônoma, operação manual ou parada.');
+    const modo = modoEl.value;
+    if (modo === 'autonomo') return { modo };
+    const causaEl = f.querySelector('[name=causa]:checked');
+    if (!causaEl) throw new Error('Escolha a causa na lista ou toque em “Outras”.');
+    if (causaEl.value === OUTRAS) {
+      const desc = f.querySelector('[name=desc]').value.trim();
+      if (!desc) throw new Error('Em “Outras”, descreva o motivo.');
+      return { modo, causa_id: '', desc };
+    }
+    return { modo, causa_id: causaEl.value };
   }
 
   function acaoIniciarTurno(f) {
@@ -289,13 +314,13 @@
     if (novo === antigo) throw new Error('Este já é o implemento em uso.');
     const troca = resolverHora(f.querySelector('[name=hora]').value, Date.parse(atual.inicio_iso) + 1000, 'Hora da troca');
     atual.fim_iso = iso(troca);
-    t.eventos.push(criarEvento({ tipo: 'parada', disp: 'Manual', desc: `Troca de implemento (de ${nomeDe(antigo)} para ${nomeDe(novo)})` }, troca, novo));
+    t.eventos.push(criarEvento({ modo: 'manual', causa_id: '', desc: `Troca de implemento (de ${nomeDe(antigo)} para ${nomeDe(novo)})` }, troca, novo));
     tocar(t);
     state.confirmacoes[t.id] = nowMs();
     salvar();
     agendarSync();
     view = { name: 'turno' };
-    ctx.toast('Troca de implemento registrada. Quando voltar a operar, toque em "Operação autônoma".', 'success');
+    ctx.toast('Troca de implemento registrada. Quando voltar a operar, escolha a operação em “Trocar de evento”.', 'success');
   }
 
   function acaoEncerrar(f) {
@@ -374,13 +399,21 @@
       const fim = fimEl.disabled || !fimEl.value ? null : lerDataHora(fimEl);
       if (!fimEl.disabled && fim === null) throw new Error(`Evento ${n}: informe a hora de fim.`);
       if (fim !== null && fim <= ini) throw new Error(`Evento ${n}: o fim precisa ser depois do início.`);
-      const tipo = r.querySelector('[name=tipo]').value;
-      const desc = r.querySelector('[name=desc]').value.trim();
-      const disp = r.querySelector('[name=disp]').value;
-      if (tipo === 'parada' && !desc) throw new Error(`Evento ${n}: descreva o motivo da parada.`);
+      const modo = r.querySelector('[name=tipo]').value;
+      const tipo = modo === 'autonomo' ? 'autonomo' : 'parada';
+      const causaSel = tipo === 'parada' ? r.querySelector('[name=causa]').value : '';
+      const causa = causaSel && causaSel !== OUTRAS ? (listas.causas || []).find((c) => c.id === causaSel) : null;
+      let desc = '';
+      if (tipo === 'parada') {
+        if (causa) desc = causa.nome;
+        else {
+          desc = r.querySelector('[name=desc]').value.trim();
+          if (!desc) throw new Error(`Evento ${n}: escolha a causa ou, em “Outras”, descreva o motivo.`);
+        }
+      }
       return {
         id: r.dataset.ev || uuid(), inicio_iso: iso(ini), fim_iso: fim === null ? '' : iso(fim), tipo: tipo,
-        disponibilidade: tipo === 'autonomo' ? 'Autônomo' : disp, descricao_original: tipo === 'autonomo' ? '' : desc,
+        disponibilidade: DISP_DO_MODO[modo], descricao_original: desc, causa_id: causa ? causa.id : '',
         implemento_id: r.dataset.impl || implemento,
       };
     });
@@ -567,36 +600,45 @@
   function tratoresDaUsina(usinaId, manter) {
     return listas.tratores.filter((x) => x.usina_id === usinaId).map((x) => {
       const o = ocupadoPorOutro(x.id);
-      return o && x.id !== manter ? Object.assign({}, x, { _off: true, _rot: `(em uso — ${o.tecnico_nome || 'outro técnico'})` }) : x;
+      const base = x.teste ? Object.assign({}, x, { _rot: '(teste — não entra nos dados reais)' }) : x;
+      return o && x.id !== manter ? Object.assign({}, base, { _off: true, _rot: `(em uso — ${o.tecnico_nome || 'outro técnico'})` }) : base;
     });
   }
   function listasProntas() {
     return listas.usinas.length > 0 && listas.implementos.length > 0;
   }
 
+  /** Lista de causas do botão escolhido (Operação manual ou Parada) + "Outras". */
+  function htmlCausas(modo, selecionada, texto) {
+    const lista = causasDoModo(modo);
+    const opt = (valor, rotulo, marcado) =>
+      `<label class="tr-causa"><input type="radio" name="causa" value="${esc(valor)}" data-onchange="causa"${marcado ? ' checked' : ''}><span>${esc(rotulo)}</span></label>`;
+    return `<fieldset class="tr-fieldset">
+        <legend>${modo === 'manual' ? 'Por que o trator está em operação manual?' : 'Qual a causa da parada?'}</legend>
+        <div class="tr-causas">
+          ${lista.map((c) => opt(c.id, c.nome, selecionada === c.id)).join('')}
+          ${opt(OUTRAS, 'Outras', selecionada === OUTRAS)}
+        </div>
+      </fieldset>
+      <div class="field${selecionada === OUTRAS ? '' : ' hidden'}" data-outras>
+        <label>Descreva o motivo</label>
+        <textarea name="desc" rows="2" maxlength="500" placeholder="Ex.: aguardando peça do implemento">${esc(texto || '')}</textarea>
+      </div>`;
+  }
+
   function htmlEscolhaEvento(prefixo, selecionarTipo) {
+    const radio = (valor, rotulo, classe) =>
+      `<label class="tr-choice ${classe}"><input type="radio" name="tipo" value="${valor}" data-onchange="tipo"${selecionarTipo === valor ? ' checked' : ''}><span>${rotulo}</span></label>`;
     return `
       <fieldset class="tr-fieldset">
         <legend>Como está o trator?</legend>
-        <div class="tr-choices">
-          <label class="tr-choice tr-choice--auto"><input type="radio" name="tipo" value="autonomo" data-onchange="tipo"${selecionarTipo === 'autonomo' ? ' checked' : ''}><span>Operação autônoma</span></label>
-          <label class="tr-choice tr-choice--parada"><input type="radio" name="tipo" value="parada" data-onchange="tipo"${selecionarTipo === 'parada' ? ' checked' : ''}><span>Parado</span></label>
+        <div class="tr-choices tr-choices--3">
+          ${radio('autonomo', 'Operação autônoma', 'tr-choice--auto')}
+          ${radio('manual', 'Operação manual', 'tr-choice--manual')}
+          ${radio('parada', 'Parada', 'tr-choice--parada')}
         </div>
       </fieldset>
-      <div class="tr-parada hidden" data-parada>
-        <div class="field">
-          <label>Descreva o que está acontecendo</label>
-          <textarea name="desc" rows="2" maxlength="500" placeholder="Ex.: aguardando comboio de abastecimento"></textarea>
-        </div>
-        <fieldset class="tr-fieldset">
-          <legend>Situação do trator</legend>
-          <div class="tr-choices">
-            <label class="tr-choice"><input type="radio" name="disp" value="Manual"><span>Manual</span></label>
-            <label class="tr-choice"><input type="radio" name="disp" value="Não disponível"><span>Não disponível</span></label>
-          </div>
-          <p class="tr-ajuda-disp"><strong>Manual</strong> = trabalha no modo manual. <strong>Não disponível</strong> = não pode ser usado.</p>
-        </fieldset>
-      </div>`;
+      <div class="tr-parada${selecionarTipo === 'manual' || selecionarTipo === 'parada' ? '' : ' hidden'}" data-parada>${selecionarTipo === 'manual' || selecionarTipo === 'parada' ? htmlCausas(selecionarTipo) : ''}</div>`;
   }
   const agoraHHMM = () => { const d = new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
 
@@ -654,7 +696,7 @@
         <div class="tr-item__dir">${selo}<button type="button" class="link-button" data-act="editar" data-id="${esc(t.id)}">Editar</button></div></li>`;
     }
     return `<li class="tr-item"><div><strong>${fmtDiaLongo(t.data)}</strong><br>
-        <span class="muted">${esc(nomeDe(t.usina_id))} · ${esc(nomeDe(t.trator_id))} · ${esc(nomeDe(t.implemento_id))}</span><br>
+        <span class="muted">${esc(nomeDe(t.usina_id))} · ${esc(nomeDe(t.trator_id))}${tratorDeTeste(t.trator_id) ? ' <span class="tr-chip tr-chip--pend">teste</span>' : ''} · ${esc(nomeDe(t.implemento_id))}</span><br>
         <span class="muted">${fmtDuracao(totalTurnoMs(t))} · autônomo ${fmtNum(t.ha_autonomo)} ha · manual ${fmtNum(t.ha_manual)} ha</span></div>
         <div class="tr-item__dir">${selo}<button type="button" class="link-button" data-act="editar" data-id="${esc(t.id)}">Editar</button></div></li>`;
   }
@@ -712,13 +754,14 @@
     const evs = ordenados(t);
     const painel = view.painel || null;
     let h = `<section class="card tr-turno">
+      ${tratorDeTeste(t.trator_id) ? '<p class="tr-teste-aviso" role="status"><strong>Trator de teste.</strong> Este turno é uma simulação e não entra nos dados reais do dashboard.</p>' : ''}
       <div class="tr-turno__topo">
         <div><strong>${esc(nomeDe(t.usina_id))} · ${esc(nomeDe(t.trator_id))}</strong><br>
         <span class="muted">${esc(nomeDe(implementoAtual(t)))} · turno iniciado às ${fmtHora(t.inicio_iso)}</span></div>
         <div class="tr-turno__total"><span class="muted">Total do turno</span><br><strong id="trTotal">${fmtRelogio(totalTurnoMs(t))}</strong></div>
       </div>
       ${t._erro ? `<div class="alert alert--danger"><strong>Este turno ainda não foi enviado ao servidor</strong><span>${esc(t._erro)}</span></div>` : ''}
-      <div class="tr-evento ${at && at.tipo === 'autonomo' ? 'tr-evento--auto' : 'tr-evento--parada'}">
+      <div class="tr-evento tr-evento--${at && modoDe(at) !== 'autonomo' ? modoDe(at) : 'auto'}">
         <span class="tr-evento__rotulo">${at ? esc(rotuloEvento(at)) : ''}</span>
         ${at && at.descricao_original ? `<span class="tr-evento__desc">${esc(at.descricao_original)}</span>` : ''}
         <span class="tr-clock" id="trClock">${at ? fmtRelogio(nowMs() - Date.parse(at.inicio_iso)) : '00:00:00'}</span>
@@ -762,12 +805,25 @@
     }
 
     h += `<h3 class="tr-sub">Eventos do turno</h3><ol class="tr-timeline">` + evs.slice().reverse().map((e) => `
-        <li class="tr-tl tr-tl--${e.tipo}"><span class="tr-tl__hora">${fmtHora(e.inicio_iso)}${e.fim_iso ? '–' + fmtHora(e.fim_iso) : ' →'}</span>
+        <li class="tr-tl tr-tl--${modoDe(e)}"><span class="tr-tl__hora">${fmtHora(e.inicio_iso)}${e.fim_iso ? '–' + fmtHora(e.fim_iso) : ' →'}</span>
         <span class="tr-tl__txt"><strong>${esc(rotuloEvento(e))}</strong>${e.descricao_original ? '<br>' + esc(e.descricao_original) : ''}</span>
         <span class="tr-tl__dur">${e.fim_iso ? fmtDuracao(msEvento(e)) : 'em andamento'}</span></li>`).join('') + `</ol>
       <div class="tr-rodape"><button type="button" class="link-button" data-act="editar" data-id="${esc(t.id)}">Corrigir horários e textos do turno</button>
       <span id="trStatusLine" class="tr-status"></span></div></section>`;
     return h;
+  }
+
+  /** Causa (lista do botão) + descrição de "Outras", para o formulário de correção. */
+  function htmlCausaEdicao(e) {
+    const modo = modoDe(e) === 'autonomo' ? 'parada' : modoDe(e);
+    const lista = causasDoModo(modo).slice();
+    const atual = e.causa_id ? (listas.causas || []).find((c) => c.id === e.causa_id) : null;
+    if (atual && !lista.find((c) => c.id === atual.id)) lista.push(atual); // causa fora da lista do botão: mantém a escolhida
+    const outras = !e.causa_id;
+    return `<div class="field"><label>Causa</label><select name="causa" data-onchange="causa-edit">
+        ${lista.map((c) => `<option value="${esc(c.id)}"${e.causa_id === c.id ? ' selected' : ''}>${esc(c.nome)}</option>`).join('')}
+        <option value="${OUTRAS}"${outras ? ' selected' : ''}>Outras</option></select></div>
+      <div class="field${outras ? '' : ' hidden'}" data-outras><label>Descreva o motivo</label><textarea name="desc" rows="2" maxlength="500">${esc(outras ? (e.descricao_original || '') : '')}</textarea></div>`;
   }
 
   function viewEditar() {
@@ -798,10 +854,9 @@
               <div class="field"><label>Início</label><input type="datetime-local" name="ini" class="tr-input" value="${toLocalInput(e.inicio_iso)}" data-orig="${esc(e.inicio_iso)}"></div>
               <div class="field"><label>Fim</label><input type="datetime-local" name="fim" class="tr-input" value="${aberto ? '' : toLocalInput(e.fim_iso)}"${aberto ? ' disabled' : ` data-orig="${esc(e.fim_iso)}"`}></div>
             </div>
-            <div class="field"><label>Tipo</label><select name="tipo" data-onchange="tipo-edit"><option value="autonomo"${e.tipo === 'autonomo' ? ' selected' : ''}>Operação autônoma</option><option value="parada"${e.tipo === 'parada' ? ' selected' : ''}>Parada</option></select></div>
+            <div class="field"><label>Como estava o trator</label><select name="tipo" data-onchange="tipo-edit">${['autonomo', 'manual', 'parada'].map((m) => `<option value="${m}"${modoDe(e) === m ? ' selected' : ''}>${{ autonomo: 'Operação autônoma', manual: 'Operação manual', parada: 'Parada' }[m]}</option>`).join('')}</select></div>
             <div class="tr-edit-ev__parada${e.tipo === 'parada' ? '' : ' hidden'}">
-              <div class="field"><label>Situação do trator</label><select name="disp"><option${e.disponibilidade === 'Manual' ? ' selected' : ''}>Manual</option><option${e.disponibilidade === 'Não disponível' ? ' selected' : ''}>Não disponível</option></select></div>
-              <div class="field"><label>Descrição da parada</label><textarea name="desc" rows="2" maxlength="500">${esc(e.descricao_original || '')}</textarea></div>
+              ${htmlCausaEdicao(e)}
             </div>
           </div>`;
         }).join('')}
@@ -903,6 +958,16 @@
     }
   }
 
+  /** Lê tipo/causa/texto de uma linha do formulário de edição, sem validar (rascunho). */
+  function lerLinhaRascunho(r) {
+    const modo = r.querySelector('[name=tipo]').value;
+    if (modo === 'autonomo') return { tipo: 'autonomo', disponibilidade: 'Autônomo', descricao_original: '', causa_id: '' };
+    const causaSel = r.querySelector('[name=causa]') ? r.querySelector('[name=causa]').value : OUTRAS;
+    const causa = causaSel && causaSel !== OUTRAS ? (listas.causas || []).find((c) => c.id === causaSel) : null;
+    const descEl = r.querySelector('[name=desc]');
+    return { tipo: 'parada', disponibilidade: DISP_DO_MODO[modo], causa_id: causa ? causa.id : '', descricao_original: causa ? causa.nome : (descEl ? descEl.value : '') };
+  }
+
   /** Lê o formulário de edição sem validar tudo (para "Adicionar evento"). */
   function rascunhoEdicao(f, adicionar) {
     const t = state.turnos[view.id];
@@ -919,14 +984,13 @@
       const fim = fimEl.disabled || !fimEl.value ? null : lerDataHora(fimEl);
       return {
         id: r.dataset.ev, implemento_id: r.dataset.impl, inicio_iso: ini === null ? t.inicio_iso : iso(ini), fim_iso: fim === null ? '' : iso(fim),
-        tipo: r.querySelector('[name=tipo]').value, disponibilidade: r.querySelector('[name=disp]').value,
-        descricao_original: r.querySelector('[name=desc]').value,
+        ...lerLinhaRascunho(r),
       };
     });
     if (adicionar) {
       const ultimo = d.eventos.slice().sort((a, b) => Date.parse(a.inicio_iso) - Date.parse(b.inicio_iso)).filter((e) => e.fim_iso).pop();
       const ini = ultimo ? Date.parse(ultimo.fim_iso) : Date.parse(d.inicio_iso);
-      d.eventos.push({ id: uuid(), implemento_id: d.implemento_id, inicio_iso: iso(ini), fim_iso: iso(ini + 3600000), tipo: 'parada', disponibilidade: 'Manual', descricao_original: '' });
+      d.eventos.push({ id: uuid(), implemento_id: d.implemento_id, inicio_iso: iso(ini), fim_iso: iso(ini + 3600000), tipo: 'parada', disponibilidade: 'Não disponível', descricao_original: '', causa_id: '' });
     }
     return d;
   }
@@ -945,8 +1009,26 @@
         break;
       }
       case 'tipo': {
-        const parada = f.querySelector('[name=tipo]:checked');
-        f.querySelector('[data-parada]').classList.toggle('hidden', !parada || parada.value !== 'parada');
+        const modo = f.querySelector('[name=tipo]:checked');
+        const caixa = f.querySelector('[data-parada]');
+        const comCausa = modo && (modo.value === 'manual' || modo.value === 'parada');
+        caixa.classList.toggle('hidden', !comCausa);
+        caixa.innerHTML = comCausa ? htmlCausas(modo.value) : '';
+        break;
+      }
+      case 'causa': {
+        const escolhida = f.querySelector('[name=causa]:checked');
+        const caixa = f.querySelector('[data-outras]');
+        if (caixa) {
+          const outras = escolhida && escolhida.value === OUTRAS;
+          caixa.classList.toggle('hidden', !outras);
+          if (outras) caixa.querySelector('textarea').focus();
+        }
+        break;
+      }
+      case 'causa-edit': {
+        const caixa = alvo.closest('[data-ev]').querySelector('[data-outras]');
+        if (caixa) caixa.classList.toggle('hidden', alvo.value !== OUTRAS);
         break;
       }
       case 'usina-edit': {
@@ -956,7 +1038,15 @@
         break;
       }
       case 'tipo-edit': {
-        alvo.closest('[data-ev]').querySelector('.tr-edit-ev__parada').classList.toggle('hidden', alvo.value !== 'parada');
+        const linha = alvo.closest('[data-ev]');
+        const box = linha.querySelector('.tr-edit-ev__parada');
+        box.classList.toggle('hidden', alvo.value === 'autonomo');
+        if (alvo.value !== 'autonomo') {
+          box.innerHTML = htmlCausaEdicao({ tipo: 'parada', disponibilidade: DISP_DO_MODO[alvo.value], causa_id: '', descricao_original: '' });
+          const sel = box.querySelector('[name=causa]');
+          const primeira = sel.options[0];
+          if (primeira && primeira.value !== OUTRAS) { sel.value = primeira.value; box.querySelector('[data-outras]').classList.add('hidden'); }
+        }
         break;
       }
     }

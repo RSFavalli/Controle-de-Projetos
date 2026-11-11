@@ -116,6 +116,8 @@ const TratorDash = (() => {
       de: f.de, ate: f.ate, implemento: f.implemento, trator: f.trator, causa: f.causa,
       responsaveis: f.responsaveis.size >= 3 ? [] : Array.from(f.responsaveis),
       revisao: f.revisao,
+      modo: f.modo === 'teste' ? 'teste' : 'reais',
+      testeIds: (listas.tratores || []).filter((t) => t.teste).map((t) => t.id),
     };
   }
 
@@ -124,7 +126,7 @@ const TratorDash = (() => {
       usinas: new Set(listas.usinas.map((u) => u.id)),
       de: '', ate: '', atalho: '', implemento: '', trator: '', causa: '',
       responsaveis: new Set(['Cliente', 'ASI/Agricef', 'Não gerenciável']),
-      revisao: 'todos',
+      revisao: 'todos', modo: 'reais',
     };
   }
 
@@ -135,8 +137,14 @@ const TratorDash = (() => {
       `<button type="button" class="trd-chip${on ? ' is-on' : ''}" data-chip="${grupo}" data-id="${esc(id)}" aria-pressed="${on}">${esc(rotulo)}</button>`;
     const opcoes = (lista, atual, todos) =>
       `<option value="">${todos}</option>` + lista.map((x) => `<option value="${esc(x.id)}"${x.id === atual ? ' selected' : ''}>${esc(x.nome)}</option>`).join('');
-    const tratoresVis = L.tratores.filter((t) => f.usinas.has(t.usina_id) && (!t.id.startsWith('historico-') || true));
+    const tratoresVis = L.tratores.filter((t) => f.usinas.has(t.usina_id) && !!t.teste === (f.modo === 'teste'));
     el.innerHTML = `
+      <div class="trd-modo${f.modo === 'teste' ? ' trd-modo--teste' : ''}" role="group" aria-label="Origem dos dados">
+        <span class="trd-filtro__rot">Dados</span>
+        <button type="button" class="trd-chip${f.modo === 'teste' ? '' : ' is-on'}" data-modo="reais" aria-pressed="${f.modo !== 'teste'}">Dados reais</button>
+        <button type="button" class="trd-chip${f.modo === 'teste' ? ' is-on' : ''}" data-modo="teste" aria-pressed="${f.modo === 'teste'}">Trator de teste</button>
+        ${f.modo === 'teste' ? '<span class="trd-modo__aviso" role="status"><strong>Modo simulação.</strong> Só aparecem os tratores de teste; nada disto entra nos dados reais.</span>' : ''}
+      </div>
       <div class="trd-filtros">
         <div class="trd-filtro"><span class="trd-filtro__rot">Usina</span>${usinasDe(estado).map((u) => chip('usina', u.id, u.nome, f.usinas.has(u.id))).join('')}</div>
         <div class="trd-filtro"><span class="trd-filtro__rot">Período</span>
@@ -181,7 +189,10 @@ const TratorDash = (() => {
     on('#trfTrator', 'change', (e) => cb.setFiltro({ trator: e.target.value }));
     on('#trfCausa', 'change', (e) => cb.setFiltro({ causa: e.target.value }));
     on('#trfRevisao', 'change', (e) => cb.setFiltro({ revisao: e.target.value }));
-    on('#trfLimpar', 'click', () => cb.setFiltro(filtrosPadrao(L)));
+    on('#trfLimpar', 'click', () => cb.setFiltro(Object.assign(filtrosPadrao(L), { modo: f.modo })));
+    el.querySelectorAll('[data-modo]').forEach((b) => b.addEventListener('click', () => {
+      if (b.dataset.modo !== (f.modo || 'reais')) cb.setFiltro({ modo: b.dataset.modo, trator: '' });
+    }));
   }
 
   /* --------------------------- aviso "A classificar" --------------------------- */

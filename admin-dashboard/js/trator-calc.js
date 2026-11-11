@@ -70,7 +70,9 @@
 
   /**
    * Filtros: { usinas: Set|[], de, ate ('YYYY-MM-DD'), implemento, trator,
-   *   causa, responsaveis: Set|[], revisao: 'todos'|'classificados'|'a-classificar' }
+   *   causa, responsaveis: Set|[], revisao: 'todos'|'classificados'|'a-classificar',
+   *   modo: 'reais' (padrão) | 'teste', testeIds: ids dos tratores de teste }
+   * Modo 'reais' tira os tratores de teste da conta; modo 'teste' mostra só eles (simulações).
    * usina, período, implemento e trator valem para tudo; causa e responsável só para as paradas
    * (a operação autônoma continua visível como referência).
    */
@@ -78,7 +80,10 @@
     f = f || {};
     const usinas = f.usinas && f.usinas.size !== undefined ? Array.from(f.usinas) : (f.usinas || []);
     const resps = f.responsaveis && f.responsaveis.size !== undefined ? Array.from(f.responsaveis) : (f.responsaveis || []);
+    const testeIds = f.testeIds || [];
+    const soTeste = f.modo === 'teste';
     const baseOk = (x) =>
+      (!testeIds.length || (testeIds.indexOf(x.trator_id) !== -1) === soTeste) &&
       (!usinas.length || usinas.indexOf(x.usina_id) !== -1) &&
       (!f.de || x.data >= f.de) && (!f.ate || x.data <= f.ate) &&
       (!f.implemento || x.implemento_id === f.implemento) &&
