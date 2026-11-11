@@ -60,7 +60,7 @@
         tecnico: e.tecnico_nome || t.tecnico_nome || '', data: t.data || String(e.inicio_iso).slice(0, 10),
         t0: Date.parse(e.inicio_iso), t1: Date.parse(e.fim_iso), h: h,
         operacao: e.operacao || (e.tipo === 'autonomo' ? 'Em operação' : 'Parado'), disponibilidade: e.disponibilidade || '',
-        descricao: e.descricao_original || '', causa_id: e.causa_id || '', causa_nome: e.causa_nome || '',
+        descricao: e.descricao_original || '', observacao: e.observacao || '', causa_id: e.causa_id || '', causa_nome: e.causa_nome || '',
         responsavel: e.responsavel || '', origem: e.origem_classificacao || '', confianca: e.confianca,
         grupo: grupoDoEvento({ operacao: e.operacao || (e.tipo === 'autonomo' ? 'Em operação' : 'Parado'), responsavel: e.responsavel }),
       });
@@ -272,9 +272,16 @@
     return Object.keys(cont).map((k) => cont[k]).sort((a, b) => b.n - a.n).slice(0, limite || 4);
   }
 
+  /** Observações escritas pelos técnicos nos eventos da causa, das mais recentes para as mais antigas. */
+  function observacoesRecentes(eventos, causaId, limite) {
+    return eventos.filter((e) => e.causa_id === causaId && e.observacao)
+      .sort((a, b) => b.t0 - a.t0).slice(0, limite || 3)
+      .map((e) => ({ texto: String(e.observacao).trim(), data: e.data, tecnico: e.tecnico }));
+  }
+
   const api = {
     GRUPOS, A_CLASSIFICAR, HORAS_SEMANA, norm, inicioSemana, grupoDoEvento, preparar, filtrar, resumo,
-    disponibilidade, tendencia, horaDoDia, frequenciaDuracao, descricoesFrequentes,
+    disponibilidade, tendencia, horaDoDia, frequenciaDuracao, descricoesFrequentes, observacoesRecentes,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.TratorCalc = api;

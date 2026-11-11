@@ -368,9 +368,11 @@ const TratorDash = (() => {
         const acoes = estado.estatico ? '' : `
           <span class="trd-detalhe__acoes"><button type="button" class="btn btn--ghost btn--small" data-acao="ver-registros" data-causa="${esc(c.id)}">${esc(t('Ver todas as {0}', nf(c.n, 0)))}</button>
           <button type="button" class="btn btn--ghost btn--small" data-acao="filtrar-causa" data-causa="${esc(c.id)}">Filtrar o dashboard por esta causa</button></span>`;
+        const obs = estado.estatico ? [] : C.observacoesRecentes(r.eventos, c.id, 3);
+        const obsHtml = obs.length ? `<br><strong>Observações recentes:</strong> ${obs.map((o) => `“${esc(o.texto)}” <span class="muted">(${fmtData(o.data)}${o.tecnico ? ' · ' + esc(o.tecnico) : ''})</span>`).join(' · ')}` : '';
         if (!estado.estatico || desc.length) {
           det = `<div class="trd-detalhe"><strong>${esc(t('O que os técnicos escreveram (mais frequentes):'))}</strong>
-          ${lista}${acoes}</div>`;
+          ${lista}${obsHtml}${acoes}</div>`;
         }
       }
       const nomeC = causaI(estado, c.id, c.nome);
@@ -560,7 +562,7 @@ const TratorDash = (() => {
     const termo = C.norm(ui.regBusca || '');
     let lista = estado.res.eventos.slice().sort((a, b) => b.t0 - a.t0);
     if (termo) {
-      lista = lista.filter((e) => C.norm([e.descricao, e.causa_nome, e.grupo, nomeDe(L.usinas, e.usina_id), nomeDe(L.implementos, e.implemento_id), e.tecnico, e.data].join(' ')).includes(termo));
+      lista = lista.filter((e) => C.norm([e.descricao, e.observacao, e.causa_nome, e.grupo, nomeDe(L.usinas, e.usina_id), nomeDe(L.implementos, e.implemento_id), e.tecnico, e.data].join(' ')).includes(termo));
     }
     const paginas = Math.max(1, Math.ceil(lista.length / POR_PAGINA));
     ui.regPagina = Math.min(Math.max(1, ui.regPagina || 1), paginas);
@@ -576,6 +578,7 @@ const TratorDash = (() => {
         <td>${e.causa_nome ? esc(e.causa_nome) : '<em class="muted">A classificar</em>'}</td>
         <td><span class="tr-pill ${PILL[e.grupo] || ''}">${esc(e.grupo === 'A classificar' ? '—' : e.grupo)}</span></td></tr>
         ${aberto ? `<tr class="trd-reg-det"><td colspan="8"><strong>Descrição original:</strong> ${e.descricao ? `“${esc(e.descricao)}”` : '<span class="muted">sem descrição</span>'}
+          ${e.observacao ? `<br><strong>Observações:</strong> ${esc(e.observacao)}` : ''}
           <span class="muted"> · Técnico: ${esc(e.tecnico || '—')}${e.origem ? ` · Origem da causa: ${esc(e.origem)}` : ''}</span></td></tr>` : ''}`;
     }).join('');
     return `<div class="trd-reg-topo"><input type="search" id="trdBuscaReg" placeholder="Buscar por texto, causa, usina…" value="${esc(ui.regBusca || '')}" aria-label="Buscar registros" />
@@ -584,7 +587,7 @@ const TratorDash = (() => {
       ${lista.length ? '' : vazio('Nenhum evento no filtro atual.')}</div>
       <div class="trd-pag"><button type="button" class="btn btn--ghost btn--small" data-acao="pag" data-d="-1"${ui.regPagina <= 1 ? ' disabled' : ''}>Anterior</button>
         <span>Página ${ui.regPagina} de ${paginas}</span><button type="button" class="btn btn--ghost btn--small" data-acao="pag" data-d="1"${ui.regPagina >= paginas ? ' disabled' : ''}>Próxima</button></div>
-      <p class="muted trd-nota">A descrição escrita pelo técnico aparece ao clicar na linha.</p>`;
+      <p class="muted trd-nota">A descrição e as observações escritas pelo técnico aparecem ao clicar na linha.</p>`;
   }
 
   /* ------------------------------ montagem das abas ------------------------------ */

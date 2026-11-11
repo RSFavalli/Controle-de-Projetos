@@ -107,6 +107,7 @@
 .tr-evento--parada { background: var(--color-danger-light, #fbe9e7); border: 2px solid var(--color-danger, #b3261e); }
 .tr-evento__rotulo { font-weight: 700; font-size: 1.05rem; }
 .tr-evento__desc { font-size: 0.92rem; color: var(--color-text-muted); }
+.tr-evento__obs { display: block; font-size: 0.88rem; color: var(--color-text-muted); font-style: italic; margin-top: 2px; }
 .tr-evento__desde { font-size: 0.8rem; color: var(--color-text-muted); }
 .tr-clock {
   font-size: 2.6rem;

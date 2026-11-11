@@ -226,7 +226,7 @@
       observacao: t.observacao || '', criado_em: t.criado_em, atualizado_em: t.atualizado_em,
       eventos: (t.eventos || []).map((e) => ({
         id: e.id, inicio_iso: e.inicio_iso, fim_iso: e.fim_iso || '', tipo: e.tipo, disponibilidade: e.disponibilidade || '',
-        descricao_original: e.descricao_original || '', causa_id: e.causa_id || '', implemento_id: e.implemento_id || t.implemento_id,
+        descricao_original: e.descricao_original || '', observacao: e.observacao || '', causa_id: e.causa_id || '', implemento_id: e.implemento_id || t.implemento_id,
       })),
     };
   }
@@ -244,6 +244,7 @@
       disponibilidade: DISP_DO_MODO[modo],
       descricao_original: modo === 'autonomo' ? '' : (causa ? causa.nome : dados.desc),
       causa_id: modo === 'autonomo' ? '' : (causa ? causa.id : ''),
+      observacao: modo === 'autonomo' ? '' : String(dados.obs || '').trim(),
       implemento_id: implementoId,
     };
   }
@@ -254,12 +255,14 @@
     if (modo === 'autonomo') return { modo };
     const causaEl = f.querySelector('[name=causa]:checked');
     if (!causaEl) throw new Error('Escolha a causa na lista ou toque em “Outras”.');
+    const obsEl = f.querySelector('[name=obs_ev]');
+    const obs = obsEl ? obsEl.value.trim() : '';
     if (causaEl.value === OUTRAS) {
       const desc = f.querySelector('[name=desc]').value.trim();
       if (!desc) throw new Error('Em “Outras”, descreva o motivo.');
-      return { modo, causa_id: '', desc };
+      return { modo, causa_id: '', desc, obs };
     }
-    return { modo, causa_id: causaEl.value };
+    return { modo, causa_id: causaEl.value, obs };
   }
 
   function acaoIniciarTurno(f) {
@@ -414,6 +417,7 @@
       return {
         id: r.dataset.ev || uuid(), inicio_iso: iso(ini), fim_iso: fim === null ? '' : iso(fim), tipo: tipo,
         disponibilidade: DISP_DO_MODO[modo], descricao_original: desc, causa_id: causa ? causa.id : '',
+        observacao: tipo === 'parada' ? ((r.querySelector('[name=obs_ev]') || { value: '' }).value.trim()) : '',
         implemento_id: r.dataset.impl || implemento,
       };
     });
@@ -609,7 +613,7 @@
   }
 
   /** Lista de causas do botão escolhido (Operação manual ou Parada) + "Outras". */
-  function htmlCausas(modo, selecionada, texto) {
+  function htmlCausas(modo, selecionada, texto, obs) {
     const lista = causasDoModo(modo);
     const opt = (valor, rotulo, marcado) =>
       `<label class="tr-causa"><input type="radio" name="causa" value="${esc(valor)}" data-onchange="causa"${marcado ? ' checked' : ''}><span>${esc(rotulo)}</span></label>`;
@@ -623,6 +627,10 @@
       <div class="field${selecionada === OUTRAS ? '' : ' hidden'}" data-outras>
         <label>Descreva o motivo</label>
         <textarea name="desc" rows="2" maxlength="500" placeholder="Ex.: aguardando peça do implemento">${esc(texto || '')}</textarea>
+      </div>
+      <div class="field">
+        <label>Observações <span class="muted">(opcional)</span></label>
+        <textarea name="obs_ev" rows="2" maxlength="500" placeholder="Mais detalhes sobre o que aconteceu">${esc(obs || '')}</textarea>
       </div>`;
   }
 
@@ -764,6 +772,7 @@
       <div class="tr-evento tr-evento--${at && modoDe(at) !== 'autonomo' ? modoDe(at) : 'auto'}">
         <span class="tr-evento__rotulo">${at ? esc(rotuloEvento(at)) : ''}</span>
         ${at && at.descricao_original ? `<span class="tr-evento__desc">${esc(at.descricao_original)}</span>` : ''}
+        ${at && at.observacao ? `<span class="tr-evento__obs">Obs.: ${esc(at.observacao)}</span>` : ''}
         <span class="tr-clock" id="trClock">${at ? fmtRelogio(nowMs() - Date.parse(at.inicio_iso)) : '00:00:00'}</span>
         <span class="tr-evento__desde">desde ${at ? fmtHora(at.inicio_iso) : ''}</span>
       </div>`;
@@ -806,7 +815,7 @@
 
     h += `<h3 class="tr-sub">Eventos do turno</h3><ol class="tr-timeline">` + evs.slice().reverse().map((e) => `
         <li class="tr-tl tr-tl--${modoDe(e)}"><span class="tr-tl__hora">${fmtHora(e.inicio_iso)}${e.fim_iso ? '–' + fmtHora(e.fim_iso) : ' →'}</span>
-        <span class="tr-tl__txt"><strong>${esc(rotuloEvento(e))}</strong>${e.descricao_original ? '<br>' + esc(e.descricao_original) : ''}</span>
+        <span class="tr-tl__txt"><strong>${esc(rotuloEvento(e))}</strong>${e.descricao_original ? '<br>' + esc(e.descricao_original) : ''}${e.observacao ? '<br><span class="muted">Obs.: ' + esc(e.observacao) + '</span>' : ''}</span>
         <span class="tr-tl__dur">${e.fim_iso ? fmtDuracao(msEvento(e)) : 'em andamento'}</span></li>`).join('') + `</ol>
       <div class="tr-rodape"><button type="button" class="link-button" data-act="editar" data-id="${esc(t.id)}">Corrigir horários e textos do turno</button>
       <span id="trStatusLine" class="tr-status"></span></div></section>`;
@@ -823,7 +832,8 @@
     return `<div class="field"><label>Causa</label><select name="causa" data-onchange="causa-edit">
         ${lista.map((c) => `<option value="${esc(c.id)}"${e.causa_id === c.id ? ' selected' : ''}>${esc(c.nome)}</option>`).join('')}
         <option value="${OUTRAS}"${outras ? ' selected' : ''}>Outras</option></select></div>
-      <div class="field${outras ? '' : ' hidden'}" data-outras><label>Descreva o motivo</label><textarea name="desc" rows="2" maxlength="500">${esc(outras ? (e.descricao_original || '') : '')}</textarea></div>`;
+      <div class="field${outras ? '' : ' hidden'}" data-outras><label>Descreva o motivo</label><textarea name="desc" rows="2" maxlength="500">${esc(outras ? (e.descricao_original || '') : '')}</textarea></div>
+      <div class="field"><label>Observações <span class="muted">(opcional)</span></label><textarea name="obs_ev" rows="2" maxlength="500">${esc(e.observacao || '')}</textarea></div>`;
   }
 
   function viewEditar() {
@@ -961,11 +971,12 @@
   /** Lê tipo/causa/texto de uma linha do formulário de edição, sem validar (rascunho). */
   function lerLinhaRascunho(r) {
     const modo = r.querySelector('[name=tipo]').value;
-    if (modo === 'autonomo') return { tipo: 'autonomo', disponibilidade: 'Autônomo', descricao_original: '', causa_id: '' };
+    if (modo === 'autonomo') return { tipo: 'autonomo', disponibilidade: 'Autônomo', descricao_original: '', causa_id: '', observacao: '' };
     const causaSel = r.querySelector('[name=causa]') ? r.querySelector('[name=causa]').value : OUTRAS;
     const causa = causaSel && causaSel !== OUTRAS ? (listas.causas || []).find((c) => c.id === causaSel) : null;
     const descEl = r.querySelector('[name=desc]');
-    return { tipo: 'parada', disponibilidade: DISP_DO_MODO[modo], causa_id: causa ? causa.id : '', descricao_original: causa ? causa.nome : (descEl ? descEl.value : '') };
+    const obsEl = r.querySelector('[name=obs_ev]');
+    return { tipo: 'parada', disponibilidade: DISP_DO_MODO[modo], causa_id: causa ? causa.id : '', descricao_original: causa ? causa.nome : (descEl ? descEl.value : ''), observacao: obsEl ? obsEl.value : '' };
   }
 
   /** Lê o formulário de edição sem validar tudo (para "Adicionar evento"). */
@@ -990,7 +1001,7 @@
     if (adicionar) {
       const ultimo = d.eventos.slice().sort((a, b) => Date.parse(a.inicio_iso) - Date.parse(b.inicio_iso)).filter((e) => e.fim_iso).pop();
       const ini = ultimo ? Date.parse(ultimo.fim_iso) : Date.parse(d.inicio_iso);
-      d.eventos.push({ id: uuid(), implemento_id: d.implemento_id, inicio_iso: iso(ini), fim_iso: iso(ini + 3600000), tipo: 'parada', disponibilidade: 'Não disponível', descricao_original: '', causa_id: '' });
+      d.eventos.push({ id: uuid(), implemento_id: d.implemento_id, inicio_iso: iso(ini), fim_iso: iso(ini + 3600000), tipo: 'parada', disponibilidade: 'Não disponível', descricao_original: '', causa_id: '', observacao: '' });
     }
     return d;
   }
@@ -1013,7 +1024,8 @@
         const caixa = f.querySelector('[data-parada]');
         const comCausa = modo && (modo.value === 'manual' || modo.value === 'parada');
         caixa.classList.toggle('hidden', !comCausa);
-        caixa.innerHTML = comCausa ? htmlCausas(modo.value) : '';
+        const obsAntes = caixa.querySelector('[name=obs_ev]');
+        caixa.innerHTML = comCausa ? htmlCausas(modo.value, undefined, '', obsAntes ? obsAntes.value : '') : '';
         break;
       }
       case 'causa': {
@@ -1042,7 +1054,8 @@
         const box = linha.querySelector('.tr-edit-ev__parada');
         box.classList.toggle('hidden', alvo.value === 'autonomo');
         if (alvo.value !== 'autonomo') {
-          box.innerHTML = htmlCausaEdicao({ tipo: 'parada', disponibilidade: DISP_DO_MODO[alvo.value], causa_id: '', descricao_original: '' });
+          const obsAntes = box.querySelector('[name=obs_ev]');
+          box.innerHTML = htmlCausaEdicao({ tipo: 'parada', disponibilidade: DISP_DO_MODO[alvo.value], causa_id: '', descricao_original: '', observacao: obsAntes ? obsAntes.value : '' });
           const sel = box.querySelector('[name=causa]');
           const primeira = sel.options[0];
           if (primeira && primeira.value !== OUTRAS) { sel.value = primeira.value; box.querySelector('[data-outras]').classList.add('hidden'); }
