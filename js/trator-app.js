@@ -673,7 +673,8 @@
         h += `<p class="field-hint">Usinas, tratores e implementos ainda não foram carregados neste aparelho. Conecte-se à internet e toque em Sincronizar.</p>`;
       }
     }
-    h += `<p id="trStatusLine" class="tr-status"></p></section>`;
+    h += `<button type="button" class="btn btn--ghost tr-big tr-resumo-btn" data-act="ir-resumo">Resumo do dia (compartilhar)</button>
+      <p id="trStatusLine" class="tr-status"></p></section>`;
 
     if (erros.length) {
       h += `<section class="card tr-erros"><h2>Atenção: não enviados</h2>` + erros.map((t) => `
@@ -707,6 +708,68 @@
         <span class="muted">${esc(nomeDe(t.usina_id))} · ${esc(nomeDe(t.trator_id))}${tratorDeTeste(t.trator_id) ? ' <span class="tr-chip tr-chip--pend">teste</span>' : ''} · ${esc(nomeDe(t.implemento_id))}</span><br>
         <span class="muted">${fmtDuracao(totalTurnoMs(t))} · autônomo ${fmtNum(t.ha_autonomo)} ha · manual ${fmtNum(t.ha_manual)} ha</span></div>
         <div class="tr-item__dir">${selo}<button type="button" class="link-button" data-act="editar" data-id="${esc(t.id)}">Editar</button></div></li>`;
+  }
+
+  /* --------------------------- Resumo do dia (compartilhar) --------------------------- */
+
+  function resumoDoDia(dataStr) {
+    return window.TratorResumo.montar({
+      data: dataStr, tecnico: (ctx.session && ctx.session.nome) || '', turnos: todosTurnos(), agora: nowMs(),
+      nomeDe: nomeDe,
+      causaNome: (id) => { const c = (listas.causas || []).find((x) => x.id === id); return c ? c.nome : ''; },
+      tratorDeTeste: tratorDeTeste,
+    });
+  }
+
+  function viewResumo() {
+    const dataStr = view.data || localDate(nowMs());
+    const m = resumoDoDia(dataStr);
+    const vazio = !m.turnos.length && !m.semOperacao.length;
+    return `<section class="card">
+      <h2>Resumo do dia</h2>
+      <div class="field"><label for="trResumoData">Dia</label>
+        <input type="date" id="trResumoData" class="tr-input" value="${esc(dataStr)}" max="${esc(localDate(nowMs()))}" data-onchange="resumo-data"></div>
+      ${vazio ? '<p class="empty-state">Nenhum turno registrado neste dia.</p>' : `
+        <p class="field-hint">Escolha como compartilhar: o aparelho abre as opções (WhatsApp, e-mail e outros) e você decide para quem enviar. O PDF abre em qualquer celular e não pode ser editado.</p>
+        <div class="tr-big-grid">
+          <button type="button" class="btn btn--start tr-big" data-act="compartilhar-pdf">Compartilhar PDF</button>
+          <button type="button" class="btn btn--ghost tr-big" data-act="compartilhar-html">Compartilhar HTML</button>
+        </div>
+        <iframe class="tr-resumo-frame" title="Prévia do resumo do dia" sandbox="allow-same-origin" srcdoc="${esc(window.TratorResumo.documentoHtml(m)).replace(/"/g, '&quot;')}"></iframe>`}
+      <div class="inline-form__actions"><button type="button" class="btn btn--ghost" data-act="voltar">Voltar</button></div>
+    </section>`;
+  }
+
+  function baixarArquivo(arquivo) {
+    const url = URL.createObjectURL(arquivo);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = arquivo.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  }
+
+  async function compartilharResumo(formato) {
+    const R = window.TratorResumo;
+    const m = resumoDoDia(view.data || localDate(nowMs()));
+    const ehPdf = formato === 'pdf';
+    const nome = R.nomeArquivo(m, ehPdf ? 'pdf' : 'html');
+    const arquivo = ehPdf
+      ? new File([R.pdf(m)], nome, { type: 'application/pdf' })
+      : new File([R.documentoHtml(m)], nome, { type: 'text/html' });
+    const titulo = `Resumo do dia ${fmtDia(m.data)} — Trator Autônomo`;
+    try {
+      if (navigator.canShare && navigator.canShare({ files: [arquivo] })) {
+        await navigator.share({ files: [arquivo], title: titulo, text: R.textoCurto(m) });
+        return;
+      }
+    } catch (e) {
+      if (e && e.name === 'AbortError') return; // o técnico fechou a folha de compartilhar
+    }
+    baixarArquivo(arquivo);
+    ctx.toast('Este aparelho não abre o compartilhamento direto. O arquivo foi baixado: anexe-o no WhatsApp ou no e-mail.', 'success');
   }
 
   function viewIniciar() {
@@ -892,12 +955,19 @@
       case 'semop': corpo = viewSemOp(); break;
       case 'turno': corpo = viewTurno(); break;
       case 'editar': corpo = viewEditar(); break;
+      case 'resumo': corpo = viewResumo(); break;
       default: view = { name: 'home' }; corpo = viewHome();
     }
     el.innerHTML = `<div id="trBanner" class="tr-banner-area" aria-live="polite"></div>${corpo}`;
     bannerKey = '';
     atualizarStatus();
     atualizarBanner();
+    const frame = el.querySelector('.tr-resumo-frame');
+    if (frame) {
+      const ajustar = () => { try { frame.style.height = frame.contentDocument.documentElement.scrollHeight + 4 + 'px'; } catch (e) { /* mantém a altura padrão */ } };
+      frame.addEventListener('load', ajustar);
+      ajustar();
+    }
     window.scrollTo({ top: 0 });
   }
 
@@ -937,6 +1007,9 @@
       case 'ir-iniciar': view = { name: 'iniciar', draft: {} }; render(); break;
       case 'ir-semop': view = { name: 'semop' }; render(); break;
       case 'ir-turno': view = { name: 'turno' }; render(); break;
+      case 'ir-resumo': view = { name: 'resumo', data: localDate(nowMs()) }; render(); break;
+      case 'compartilhar-pdf': compartilharResumo('pdf'); break;
+      case 'compartilhar-html': compartilharResumo('html'); break;
       case 'voltar': view = { name: 'home' }; render(); break;
       case 'abrir-troca': view = { name: 'turno', painel: 'troca' }; render(); break;
       case 'abrir-impl': view = { name: 'turno', painel: 'impl' }; render(); break;
@@ -1017,6 +1090,10 @@
         view.draft.trator = '';
         const sel = f.querySelector('[name=trator]');
         sel.innerHTML = optionsDe(view.draft.usina ? tratoresDaUsina(view.draft.usina) : [], '', view.draft.usina ? 'Selecione o trator' : 'Escolha a usina primeiro');
+        break;
+      }
+      case 'resumo-data': {
+        if (alvo.value) { view = { name: 'resumo', data: alvo.value }; render(); }
         break;
       }
       case 'tipo': {

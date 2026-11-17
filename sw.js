@@ -12,7 +12,7 @@
  * ------------------------------------------------------------------
  */
 
-const CACHE_NAME = 'timesheet-cache-v9';
+const CACHE_NAME = 'timesheet-cache-v10';
 
 const APP_SHELL_FILES = [
   './',
@@ -25,6 +25,7 @@ const APP_SHELL_FILES = [
   './js/db.js',
   './js/api.js',
   './js/timer.js',
+  './js/trator-resumo.js',
   './js/trator-app.js',
   './js/app.js',
   './icons/icon-192.png',
